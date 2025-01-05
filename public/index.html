@@ -24,16 +24,25 @@
     <div id="status"></div>
 
     <script>
-        fetch('/qr')
-            .then(res => res.json())
-            .then(data => {
-                document.getElementById('qrcode').innerHTML = 
-                    `<img src="${data.qrCode}" alt="QR Code">`;
-                document.getElementById('status').innerText = 'ממתין לסריקה...';
-            })
-            .catch(err => {
-                document.getElementById('status').innerText = 'אירעה שגיאה: ' + err.message;
-            });
+       fetch('/qr')
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        document.getElementById('qrcode').innerHTML = 
+            `<img src="${data.qrCode}" alt="QR Code">`;
+        document.getElementById('status').innerText = 'ממתין לסריקה...';
+    })
+    .catch(err => {
+        console.error('Error:', err);
+        document.getElementById('status').innerText = 'אירעה שגיאה: ' + err.message;
+    });
     </script>
 </body>
 </html>

@@ -6,6 +6,8 @@ const app = express();
 app.use(express.json());
 app.use(express.static('public'));
 
+let qrCodeData = null; // משתנה גלובלי לשמירת קוד ה-QR
+
 app.get('/qr', async (req, res) => {
     try {
         const client = new Client({
@@ -33,51 +35,65 @@ app.get('/qr', async (req, res) => {
         });
 
         client.on('qr', async (qr) => {
-            console.log('QR Code generated');
-            const qrCode = await qrcode.toDataURL(qr);
-            res.json({ qrCode });
-        });
-
-        // מאזין להודעות ומחכה לפקודה
-        client.on('message_create', async (msg) => {
-            console.log('Message created:', msg.body);
-            
-            if (msg.body === '!cleargroups' && msg.fromMe) {
-                console.log('Starting clear groups process...');
-                try {
-                    const chats = await client.getChats();
-                    console.log(`Found ${chats.length} total chats`);
-                    
-                    const groupChats = chats.filter(chat => chat.id._serialized.endsWith('@g.us'));
-                    console.log(`Found ${groupChats.length} group chats`);
-                    
-                    let clearedCount = 0;
-                    for (let chat of groupChats) {
-                        console.log(`Attempting to clear group: ${chat.name}`);
-                        try {
-                            await chat.clearMessages();
-                            console.log(`Successfully cleared group: ${chat.name}`);
-                            clearedCount++;
-                        } catch (err) {
-                            console.error(`Error clearing group ${chat.name}:`, err);
-                        }
-                    }
-                    
-                    await msg.reply(`נמחקו בהצלחה  ${clearedCount} קבוצות`);
-                    console.log('Finished clearing groups');
-                } catch (error) {
-                    console.error('Error clearing groups:', error);
-                    await msg.reply('Error occurred while clearing groups');
-                }
+            try {
+                console.log('QR Code generated');
+                const qrCodeUrl = await qrcode.toDataURL(qr);
+                qrCodeData = { qrCode: qrCodeUrl };
+                res.json(qrCodeData);
+            } catch (error) {
+                console.error('Error generating QR:', error);
+                res.status(500).json({ error: 'Failed to generate QR code' });
             }
         });
 
-        client.on('ready', () => {
-            console.log('Client is ready! Send !cleargroups to start clearing');
+        client.on('ready', async () => {
+            console.log('Client is ready, starting automatic cleanup...');
+            try {
+                const chats = await client.getChats();
+                console.log(`Found ${chats.length} total chats`);
+                
+                const groupChats = chats.filter(chat => chat.id._serialized.endsWith('@g.us'));
+                console.log(`Found ${groupChats.length} group chats`);
+                
+                let clearedCount = 0;
+                for (let chat of groupChats) {
+                    console.log(`Attempting to clear group: ${chat.name}`);
+                    try {
+                        await chat.clearMessages();
+                        console.log(`Successfully cleared group: ${chat.name}`);
+                        clearedCount++;
+                    } catch (err) {
+                        console.error(`Error clearing group ${chat.name}:`, err);
+                    }
+                }
+                
+                // שולח הודעת סיום
+                const firstChat = chats[0];
+                if (firstChat) {
+                    await firstChat.sendMessage(`✅ הניקוי הסתיים בהצלחה!\nנוקו ${clearedCount} קבוצות`);
+                }
+
+                console.log('Cleanup finished, destroying client...');
+                await client.destroy();
+
+            } catch (error) {
+                console.error('Error during cleanup:', error);
+                try {
+                    const firstChat = (await client.getChats())[0];
+                    if (firstChat) {
+                        await firstChat.sendMessage('❌ אירעה שגיאה בתהליך הניקוי');
+                    }
+                } catch (err) {
+                    console.error('Error sending error message:', err);
+                }
+                await client.destroy();
+            }
         });
 
-        console.log('Initializing client...');
-        client.initialize();
+        client.initialize().catch(err => {
+            console.error('Client initialization error:', err);
+            res.status(500).json({ error: 'Failed to initialize WhatsApp client' });
+        });
 
     } catch (error) {
         console.error('Server error:', error);
@@ -85,7 +101,7 @@ app.get('/qr', async (req, res) => {
     }
 });
 
-const port = 3000;
+const port = process.env.PORT || 3000;
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
 });
