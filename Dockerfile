@@ -25,5 +25,7 @@ RUN npm install
 COPY . .
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV NODE_ENV=production
+
 
 CMD ["node", "index.js"]
