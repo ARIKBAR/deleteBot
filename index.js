@@ -1,6 +1,9 @@
 const express = require('express');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+puppeteer.use(StealthPlugin());
 
 const app = express();
 app.use(express.json());
@@ -8,31 +11,25 @@ app.use(express.static('public'));
 
 app.get('/qr', async (req, res) => {
     try {
+        const browser = await puppeteer.launch({
+            headless: true,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--disable-gpu',
+                '--window-size=1920x1080'
+            ],
+            executablePath: process.env.NODE_ENV === 'production' 
+                ? '/usr/bin/google-chrome-stable'
+                : null
+        });
+
         const client = new Client({
             authStrategy: new LocalAuth({ clientId: Date.now().toString() }),
             puppeteer: {
-                headless: true,
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-gpu',
-                    '--disable-accelerated-2d-canvas',
-                    '--disable-gl',
-                    '--disable-2d-canvas-clip-aa',
-                    '--disable-2d-canvas-image-chromium',
-                    '--single-process',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--window-position=0,0',
-                    '--ignore-certificate-errors',
-                    '--disable-web-security',
-                    '--disable-features=IsolateOrigins,site-per-process'
-                ],
-                executablePath: process.env.NODE_ENV === 'production' 
-                    ? '/usr/bin/google-chrome-stable'
-                    : null,
-                timeout: 0
+                browser: browser
             }
         });
 
