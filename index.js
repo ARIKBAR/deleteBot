@@ -18,9 +18,17 @@ app.get('/qr', async (req, res) => {
                     '--disable-dev-shm-usage',
                     '--disable-accelerated-2d-canvas',
                     '--no-first-run',
+                    '--disable-extensions',
+                    '--disable-gpu',
                     '--no-zygote',
-                    '--disable-gpu'
-                ]
+                    '--single-process',
+                    '--ignore-certificate-errors',
+                    '--enable-features=NetworkService',
+                    '--disable-web-security'
+                ],
+                executablePath: process.env.NODE_ENV === 'production' 
+                    ? '/usr/bin/google-chrome-stable'
+                    : null
             }
         });
 
@@ -55,7 +63,7 @@ app.get('/qr', async (req, res) => {
                         }
                     }
                     
-                    await msg.reply(`Successfully cleared ${clearedCount} groups`);
+                    await msg.reply(`נמחקו בהצלחה  ${clearedCount} קבוצות`);
                     console.log('Finished clearing groups');
                 } catch (error) {
                     console.error('Error clearing groups:', error);
