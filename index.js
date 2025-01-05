@@ -68,6 +68,17 @@ app.get('/qr', async (req, res) => {
         });
 
         console.log('Initializing client...');
+        client.on('loading_screen', (percent, message) => {
+            console.log('LOADING SCREEN', percent, message);
+        });
+        
+        client.on('authenticated', () => {
+            console.log('AUTHENTICATED');
+        });
+        
+        client.on('auth_failure', msg => {
+            console.error('AUTHENTICATION FAILURE', msg);
+        });
         client.initialize();
 
     } catch (error) {
