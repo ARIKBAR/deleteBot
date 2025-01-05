@@ -10,41 +10,52 @@ const app = express();
 app.use(express.json());
 app.use(express.static('public'));
 
+// יצירת browser instance גלובלי
+let globalBrowser = null;
+
+async function initBrowser() {
+    if (globalBrowser) return globalBrowser;
+    
+    globalBrowser = await puppeteer.launch({
+        headless: true,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-accelerated-2d-canvas',
+            '--disable-gl',
+            '--disable-2d-canvas-clip-aa',
+            '--disable-2d-canvas-image-chromium',
+            '--single-process',
+            '--no-first-run',
+            '--no-zygote',
+            '--window-position=0,0',
+            '--ignore-certificate-errors',
+            '--disable-web-security'
+        ],
+        ...(process.env.NODE_ENV === 'production' ? { 
+            executablePath: '/usr/bin/google-chrome-stable' 
+        } : {})
+    });
+
+    return globalBrowser;
+}
+
 app.get('/qr', async (req, res) => {
     try {
+        // יצירת browser instance
+        const browser = await initBrowser();
+
         const clientConfig = {
             authStrategy: new LocalAuth({ clientId: Date.now().toString() }),
             puppeteer: {
                 headless: true,
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-gpu',
-                    '--disable-accelerated-2d-canvas',
-                    '--disable-gl',
-                    '--disable-2d-canvas-clip-aa',
-                    '--disable-2d-canvas-image-chromium',
-                    '--single-process',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--window-position=0,0',
-                    '--ignore-certificate-errors',
-                    '--disable-web-security'
-                ]
+                browser: browser
             }
         };
 
-        // הוספת הגדרות נוספות לסביבת production
-        if (process.env.NODE_ENV === 'production') {
-            clientConfig.puppeteer.executablePath = '/usr/bin/google-chrome-stable';
-        }
-        const client = new Client({
-            authStrategy: new LocalAuth({ clientId: Date.now().toString() }),
-            puppeteer: {
-                browser: browser
-            }
-        });
+        const client = new Client(clientConfig);
 
         client.on('qr', async (qr) => {
             try {
@@ -112,6 +123,14 @@ app.get('/qr', async (req, res) => {
     } catch (error) {
         console.error('Server error:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// הוספת נקודת סיום לסגירת הדפדפן
+process.on('SIGINT', async () => {
+    if (globalBrowser) {
+        await globalBrowser.close();
+        process.exit();
     }
 });
 
