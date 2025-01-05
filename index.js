@@ -16,7 +16,7 @@ let globalBrowser = null;
 async function initBrowser() {
     if (globalBrowser) return globalBrowser;
     
-    globalBrowser = await puppeteer.launch({
+    const globalBrowser = await puppeteer.launch({
         headless: true,
         args: [
             '--no-sandbox',
@@ -34,9 +34,7 @@ async function initBrowser() {
             '--ignore-certificate-errors',
             '--disable-web-security'
         ],
-        ...(process.env.NODE_ENV === 'production' ? { 
-            executablePath: '/usr/bin/google-chrome-stable' 
-        } : {})
+        executablePath: '/usr/bin/google-chrome-stable'
     });
 
     return globalBrowser;
