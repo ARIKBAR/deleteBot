@@ -42,7 +42,7 @@ async function initBrowser() {
 
 app.get('/qr', async (req, res) => {
     try {
-        // יצירת browser instance
+        // יצירת browser instanc
         const browser = await initBrowser();
 
         const clientConfig = {
