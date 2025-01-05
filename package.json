@@ -10,7 +10,9 @@
     "qrcode": "^1.5.3",
     "whatsapp-web.js": "^1.21.0",
     "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2"
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "puppeteer-core": "^19.7.0"
+
   },
   "engines": {
     "node": "16.x"
