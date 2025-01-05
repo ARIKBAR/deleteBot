@@ -7,6 +7,8 @@ app.use(express.json());
 app.use(express.static('public'));
 
 app.get('/qr', async (req, res) => {
+    let responseHasBeenSent = false;
+
     try {
         const client = new Client({
             authStrategy: new LocalAuth({ clientId: Date.now().toString() }),
@@ -20,14 +22,34 @@ app.get('/qr', async (req, res) => {
                     '--no-first-run',
                     '--no-zygote',
                     '--disable-gpu'
-                ]
+                ],
+                timeout: 120000  // 2 דקות
             }
         });
 
         client.on('qr', async (qr) => {
             console.log('QR Code generated');
-            const qrCode = await qrcode.toDataURL(qr);
-            res.json({ qrCode });
+            if (!responseHasBeenSent) {
+                const qrCode = await qrcode.toDataURL(qr);
+                res.json({ qrCode });
+                responseHasBeenSent = true;
+            }
+        });
+
+        client.on('loading_screen', (percent, message) => {
+            console.log('LOADING SCREEN', percent, message);
+        });
+
+        client.on('authenticated', () => {
+            console.log('AUTHENTICATED');
+        });
+
+        client.on('change_state', state => {
+            console.log('CHANGE STATE', state);
+        });
+
+        client.on('disconnected', (reason) => {
+            console.log('Client was disconnected:', reason);
         });
 
         client.on('message_create', async (msg) => {
@@ -47,6 +69,8 @@ app.get('/qr', async (req, res) => {
                         console.log(`Attempting to clear group: ${chat.name}`);
                         try {
                             await chat.clearMessages();
+                            // נוסיף השהייה קטנה בין כל ניקוי
+                            await new Promise(resolve => setTimeout(resolve, 2000));
                             console.log(`Successfully cleared group: ${chat.name}`);
                             clearedCount++;
                         } catch (err) {
@@ -68,22 +92,14 @@ app.get('/qr', async (req, res) => {
         });
 
         console.log('Initializing client...');
-        client.on('loading_screen', (percent, message) => {
-            console.log('LOADING SCREEN', percent, message);
-        });
-        
-        client.on('authenticated', () => {
-            console.log('AUTHENTICATED');
-        });
-        
-        client.on('auth_failure', msg => {
-            console.error('AUTHENTICATION FAILURE', msg);
-        });
         client.initialize();
 
     } catch (error) {
         console.error('Server error:', error);
-        res.status(500).json({ error: error.message });
+        if (!responseHasBeenSent) {
+            res.status(500).json({ error: error.message });
+            responseHasBeenSent = true;
+        }
     }
 });
 
