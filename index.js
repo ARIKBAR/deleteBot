@@ -26,11 +26,13 @@ app.get('/qr', async (req, res) => {
                     '--no-zygote',
                     '--window-position=0,0',
                     '--ignore-certificate-errors',
-                    '--disable-web-security'
+                    '--disable-web-security',
+                    '--disable-features=IsolateOrigins,site-per-process'
                 ],
                 executablePath: process.env.NODE_ENV === 'production' 
                     ? '/usr/bin/google-chrome-stable'
-                    : null
+                    : null,
+                timeout: 0
             }
         });
 
@@ -103,7 +105,7 @@ app.get('/qr', async (req, res) => {
     }
 });
 
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 4000;
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
 });
