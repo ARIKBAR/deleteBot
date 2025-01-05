@@ -6,8 +6,6 @@ const app = express();
 app.use(express.json());
 app.use(express.static('public'));
 
-let qrCodeData = null; // משתנה גלובלי לשמירת קוד ה-QR
-
 app.get('/qr', async (req, res) => {
     try {
         const client = new Client({
@@ -18,14 +16,16 @@ app.get('/qr', async (req, res) => {
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
                     '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--no-first-run',
-                    '--disable-extensions',
                     '--disable-gpu',
-                    '--no-zygote',
+                    '--disable-accelerated-2d-canvas',
+                    '--disable-gl',
+                    '--disable-2d-canvas-clip-aa',
+                    '--disable-2d-canvas-image-chromium',
                     '--single-process',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--window-position=0,0',
                     '--ignore-certificate-errors',
-                    '--enable-features=NetworkService',
                     '--disable-web-security'
                 ],
                 executablePath: process.env.NODE_ENV === 'production' 
@@ -37,9 +37,9 @@ app.get('/qr', async (req, res) => {
         client.on('qr', async (qr) => {
             try {
                 console.log('QR Code generated');
-                const qrCodeUrl = await qrcode.toDataURL(qr);
-                qrCodeData = { qrCode: qrCodeUrl };
-                res.json(qrCodeData);
+                const qrCode = await qrcode.toDataURL(qr);
+                global.lastQR = qrCode;
+                res.json({ qrCode });
             } catch (error) {
                 console.error('Error generating QR:', error);
                 res.status(500).json({ error: 'Failed to generate QR code' });
@@ -73,11 +73,11 @@ app.get('/qr', async (req, res) => {
                     await firstChat.sendMessage(`✅ הניקוי הסתיים בהצלחה!\nנוקו ${clearedCount} קבוצות`);
                 }
 
-                console.log('Cleanup finished, destroying client...');
+                console.log('Cleanup finished');
                 await client.destroy();
 
             } catch (error) {
-                console.error('Error during cleanup:', error);
+                console.error('Error in cleanup process:', error);
                 try {
                     const firstChat = (await client.getChats())[0];
                     if (firstChat) {
@@ -90,10 +90,12 @@ app.get('/qr', async (req, res) => {
             }
         });
 
-        client.initialize().catch(err => {
-            console.error('Client initialization error:', err);
-            res.status(500).json({ error: 'Failed to initialize WhatsApp client' });
+        client.on('disconnected', async (reason) => {
+            console.log('Client was disconnected:', reason);
+            await client.destroy();
         });
+
+        await client.initialize();
 
     } catch (error) {
         console.error('Server error:', error);
