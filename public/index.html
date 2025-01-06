@@ -2,26 +2,129 @@
 <html>
 <head>
     <title>ניקוי קבוצות וואטסאפ</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body {
             font-family: Arial, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
-            margin: 20px;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            direction: rtl;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        h1 {
+            font-size: 1.5em;
+            color: #075e54;
+            text-align: center;
+        }
+        p {
+            font-size: 1em;
+            color: #4a4a4a;
+            text-align: center;
         }
         #status {
-            margin: 20px;
+            margin: 20px 0;
             font-weight: bold;
+            text-align: center;
+            color: #ff0000;
+        }
+        #qrcode {
+            text-align: center;
+            margin: 20px 0;
+        }
+        #loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+            font-size: 1.2em;
+            color: #075e54;
+        }
+        #progressBar {
+            display: none;
+            width: 100%;
+            background-color: #f3f3f3;
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        #progressBar div {
+            width: 0;
+            height: 20px;
+            background-color: #25d366;
+            text-align: center;
+            line-height: 20px;
+            color: white;
+        }
+        #groups {
+            display: none;
+        }
+        #groupList {
+            list-style: none;
+            padding: 0;
+            font-size: 1.2em;
+        }
+        #groupList li {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        #groupList li:last-child {
+            border-bottom: none;
+        }
+        #groupList input[type="checkbox"] {
+            margin-right: 20px;
+            width: 20px;
+            height: 20px;
+            accent-color: #25d366;
+        }
+        #clearSelectedGroups, #selectAllGroups {
+            background-color: #25d366;
+            color: #ffffff;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            font-size: 1em;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+        }
+        #clearSelectedGroups:hover, #selectAllGroups:hover {
+            background-color: #1ebe57;
+        }
+        #selectAllGroups {
+            font-size: 0.9em;
         }
     </style>
 </head>
 <body>
-    <h1>ניקוי קבוצות וואטסאפ</h1>
-    <p>1. סרוק את הקוד QR עם הוואטסאפ שלך</p>
-    <p>2. אחרי החיבור, שלח את ההודעה !cleargroups לעצמך בוואטסאפ</p>
-    <div id="qrcode"></div>
-    <div id="status"></div>
+    <div class="container">
+        <h1>ניקוי קבוצות וואטסאפ</h1>
+        <p>1. סרוק את הקוד QR עם הוואטסאפ שלך</p>
+        <p>2. המתן עד לטעינת רשימת קבוצות הוואטסאפ שלך</p>
+        <div id="qrcode"></div>
+        <div id="status"></div>
+        <div id="loading">טוען קבוצות...</div>
+        <div id="progressBar"><div></div></div>
+        <div id="groups">
+            <h2>רשימת קבוצות</h2>
+            <button id="selectAllGroups">בחר הכל</button>
+            <ul id="groupList"></ul>
+            <button id="clearSelectedGroups">מחק קבוצות נבחרות</button>
+        </div>
+    </div>
 
     <script>
        fetch('/qr')
@@ -42,8 +145,115 @@
     .catch(err => {
         console.error('Error:', err);
         document.getElementById('status').innerText = 'אירעה שגיאה: ' + err.message;
-        
     });
+
+    async function fetchGroups() {
+        try {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('progressBar').style.display = 'block';
+            const response = await fetch('/groups');
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            const groups = await response.json();
+            const groupList = document.getElementById('groupList');
+            groupList.innerHTML = '';
+            groups.forEach(group => {
+                const li = document.createElement('li');
+                li.innerHTML = `<input type="checkbox" class="groupCheckbox" value="${group.id}"> ${group.name}`;
+                groupList.appendChild(li);
+            });
+            document.getElementById('groups').style.display = 'block';
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('progressBar').style.display = 'none';
+            document.getElementById('status').innerText = 'הקבוצות נטענו בהצלחה';
+        } catch (err) {
+            console.error('Error:', err);
+            document.getElementById('status').innerText = 'אירעה שגיאה: ' + err.message;
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('progressBar').style.display = 'none';
+        }
+    }
+
+    let allSelected = false;
+    document.getElementById('selectAllGroups').addEventListener('click', () => {
+        const checkboxes = document.querySelectorAll('.groupCheckbox');
+        allSelected = !allSelected;
+        checkboxes.forEach(checkbox => checkbox.checked = allSelected);
+        document.getElementById('selectAllGroups').innerText = allSelected ? 'בטל בחירה' : 'בחר הכל';
+    });
+
+    document.getElementById('clearSelectedGroups').addEventListener('click', async () => {
+        const selectedGroups = Array.from(document.querySelectorAll('.groupCheckbox:checked')).map(cb => cb.value);
+        if (selectedGroups.length === 0) {
+            alert('לא נבחרו קבוצות למחיקה');
+            return;
+        }
+        try {
+            const response = await fetch('/clear-groups', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ groupIds: selectedGroups })
+            });
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            const result = await response.json();
+            alert(result.message);
+            fetchGroups(); // Refresh the group list
+        } catch (err) {
+            console.error('Error:', err);
+            alert('אירעה שגיאה: ' + err.message);
+        }
+    });
+
+    // Call fetchGroups when client is ready
+    const eventSource = new EventSource('/events');
+    eventSource.onmessage = function(event) {
+        if (event.data === 'client_ready') {
+            document.getElementById('qrcode').style.display = 'none';
+            document.getElementById('status').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('progressBar').style.display = 'block';
+            let progress = 0;
+            const progressBar = document.getElementById('progressBar').firstElementChild;
+            const interval = setInterval(() => {
+                if (progress >= 100) {
+                    clearInterval(interval);
+                } else {
+                    progress += 3.33; // 3.33% every 300ms to reach 100% in 30 seconds
+                    progressBar.style.width = progress + '%';
+                    progressBar.innerText = Math.round(progress) + '%';
+                }
+            }, 300);
+            fetchGroups().then(() => clearInterval(interval));
+        }
+        if (event.data === 'authenticated') {
+            document.getElementById('qrcode').style.display = 'none';
+            document.getElementById('status').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('progressBar').style.display = 'block';
+            let progress = 0;
+            const progressBar = document.getElementById('progressBar').firstElementChild;
+            const interval = setInterval(() => {
+                if (progress >= 100) {
+                    clearInterval(interval);
+                } else {
+                    progress += 1.7; // 1.7% every 300ms to reach 100% in 30 seconds
+                    progressBar.style.width = progress + '%';
+                    progressBar.innerText = Math.round(progress) + '%';
+                }
+            }, 300);
+        }
+        if (event.data.startsWith('progress')) {
+            const percent = event.data.split(' ')[1];
+            const progressBar = document.getElementById('progressBar').firstElementChild;
+            progressBar.style.width = percent + '%';
+            progressBar.innerText = percent + '%';
+        }
+    };
     </script>
 </body>
 </html>

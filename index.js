@@ -1,14 +1,17 @@
 const express = require('express');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
+const events = require('events');
 
 const app = express();
 app.use(express.json());
 app.use(express.static('public'));
 
-app.get('/qr', async (req, res) => {
-    let responseHasBeenSent = false;
+let clientInstance;
 
+const eventEmitter = new events.EventEmitter();
+
+app.get('/qr', async (req, res) => {
     try {
         const client = new Client({
             authStrategy: new LocalAuth({ clientId: Date.now().toString() }),
@@ -22,38 +25,18 @@ app.get('/qr', async (req, res) => {
                     '--no-first-run',
                     '--no-zygote',
                     '--disable-gpu'
-                ],
-                timeout: 120000  // 2 דקות
+                ]
             }
         });
 
         client.on('qr', async (qr) => {
             console.log('QR Code generated');
-            if (!responseHasBeenSent) {
-                const qrCode = await qrcode.toDataURL(qr);
-                res.json({ qrCode });
-                responseHasBeenSent = true;
-            }
-        });
-
-        client.on('loading_screen', (percent, message) => {
-            console.log('LOADING SCREEN', percent, message);
-        });
-
-        client.on('authenticated', () => {
-            console.log('AUTHENTICATED');
-        });
-
-        client.on('change_state', state => {
-            console.log('CHANGE STATE', state);
-        });
-
-        client.on('disconnected', (reason) => {
-            console.log('Client was disconnected:', reason);
+            const qrCode = await qrcode.toDataURL(qr);
+            res.json({ qrCode });
         });
 
         client.on('message_create', async (msg) => {
-            console.log('Message created:', msg.body);
+            
             
             if (msg.body === '!cleargroups' && msg.fromMe) {
                 console.log('Starting clear groups process...');
@@ -66,19 +49,18 @@ app.get('/qr', async (req, res) => {
                     
                     let clearedCount = 0;
                     for (let chat of groupChats) {
-                        console.log(`Attempting to clear group: ${chat.name}`);
+                        console.log(`Attempting to clear group: ${chat.name} (ID: ${chat.id._serialized})`);
                         try {
                             await chat.clearMessages();
-                            // נוסיף השהייה קטנה בין כל ניקוי
-                            await new Promise(resolve => setTimeout(resolve, 2000));
-                            console.log(`Successfully cleared group: ${chat.name}`);
+                            console.log(`Successfully cleared group: ${chat.name} (ID: ${chat.id._serialized})`);
                             clearedCount++;
                         } catch (err) {
-                            console.error(`Error clearing group ${chat.name}:`, err);
+                            console.error(`Error clearing group ${chat.name} (ID: ${chat.id._serialized}):`, err);
                         }
                     }
                     
-                    await msg.reply(`Successfully cleared ${clearedCount} groups`);
+                    await msg.reply(`Successfully cleared ${clearedCount} groups. Group details:\n` +
+                                    groupChats.map(chat => `${chat.name} (ID: ${chat.id._serialized})`).join('\n'));
                     console.log('Finished clearing groups');
                 } catch (error) {
                     console.error('Error clearing groups:', error);
@@ -87,23 +69,109 @@ app.get('/qr', async (req, res) => {
             }
         });
 
-        client.on('ready', () => {
+        client.on('ready', async () => {
             console.log('Client is ready! Send !cleargroups to start clearing');
+            clientInstance = client;
+
+            // Fetch groups and notify the client
+            try {
+                const chats = await client.getChats();
+                const groupChats = chats.filter(chat => chat.id._serialized.endsWith('@g.us'));
+                console.log('Sending group list to client');
+                app.locals.groupChats = groupChats.map(chat => ({ id: chat.id._serialized, name: chat.name }));
+                eventEmitter.emit('client_ready');
+            } catch (error) {
+                console.error('Error fetching groups:', error);
+            }
         });
 
         console.log('Initializing client...');
+        client.on('loading_screen', (percent, message) => {
+            console.log('LOADING SCREEN', percent, message);
+        });
+        
+        client.on('authenticated', () => {
+            console.log('AUTHENTICATED');
+            eventEmitter.emit('authenticated');
+        });
+        
+        client.on('auth_failure', msg => {
+            console.error('AUTHENTICATION FAILURE', msg);
+        });
         client.initialize();
 
     } catch (error) {
         console.error('Server error:', error);
-        if (!responseHasBeenSent) {
-            res.status(500).json({ error: error.message });
-            responseHasBeenSent = true;
-        }
+        res.status(500).json({ error: error.message });
     }
 });
 
-const port = process.env.PORT || 4000;
+app.get('/events', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const clientReadyListener = () => {
+        res.write('data: client_ready\n\n');
+    };
+
+    const authenticatedListener = () => {
+        res.write('data: authenticated\n\n');
+    };
+
+    eventEmitter.on('client_ready', clientReadyListener);
+    eventEmitter.on('authenticated', authenticatedListener);
+
+    req.on('close', () => {
+        eventEmitter.removeListener('client_ready', clientReadyListener);
+        eventEmitter.removeListener('authenticated', authenticatedListener);
+    });
+});
+
+app.get('/groups', async (req, res) => {
+    try {
+        if (!clientInstance) {
+            return res.status(400).json({ error: 'Client not initialized' });
+        }
+        const chats = await clientInstance.getChats();
+        const groupChats = chats.filter(chat => chat.id._serialized.endsWith('@g.us'));
+        res.json(groupChats.map(chat => ({ id: chat.id._serialized, name: chat.name })));
+    } catch (error) {
+        console.error('Error fetching groups:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+    
+app.post('/clear-groups', async (req, res) => {
+    try {
+        if (!clientInstance) {
+            return res.status(400).json({ error: 'Client not initialized' });
+        }
+        const { groupIds } = req.body;
+        if (!Array.isArray(groupIds) || groupIds.length === 0) {
+            return res.status(400).json({ error: 'No groups selected' });
+        }
+        let clearedCount = 0;
+        for (let groupId of groupIds) {
+            const chat = await clientInstance.getChatById(groupId);
+            if (chat) {
+                try {
+                    await chat.clearMessages();
+                    clearedCount++;
+                } catch (err) {
+                    console.error(`Error clearing group ${chat.name} (ID: ${chat.id._serialized}):`, err);
+                }
+            }
+        }
+        res.json({ message: `Successfully cleared ${clearedCount} groups` });
+    } catch (error) {
+        console.error('Error clearing groups:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+const port = process.env.PORT || 2000;
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
 });
+
