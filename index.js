@@ -14,8 +14,18 @@ app.get('/qr', async (req, res) => {
     try {
         const client = new Client({
             puppeteer: {
-                args: ['--no-sandbox'],
-                headless: false
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--disable-gpu',
+                    '--single-process'
+                ],
+                headless: "new",
+                timeout: 0
             },
             authStrategy: new LocalAuth({ dataPath: "." }),
             pairWithPhoneNumber: {
@@ -23,6 +33,7 @@ app.get('/qr', async (req, res) => {
                 showNotification: true,
             }
         });
+        
 
         client.on('code', (code) => {
             console.log("Linking code:", code);
