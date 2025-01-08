@@ -12,8 +12,8 @@
     "puppeteer": "^13.7.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "qrcode": "^1.5.3",
-    "whatsapp-web.js": "^1.26.0"
+    "whatsapp-web.js": "npm:whatsapp-web-delete-groups@1.0.0",
+    "qrcode": "^1.5.3"
   },
   "engines": {
     "node": "16.x"
