@@ -36,17 +36,17 @@ app.get('/qr', async (req, res) => {
         });
 
         client.on('message_create', async (msg) => {
-            
-            
+
+
             if (msg.body === '!cleargroups' && msg.fromMe) {
                 console.log('Starting clear groups process...');
                 try {
                     const chats = await client.getChats();
                     console.log(`Found ${chats.length} total chats`);
-                    
+
                     const groupChats = chats.filter(chat => chat.id._serialized.endsWith('@g.us'));
                     console.log(`Found ${groupChats.length} group chats`);
-                    
+
                     let clearedCount = 0;
                     for (let chat of groupChats) {
                         console.log(`Attempting to clear group: ${chat.name} (ID: ${chat.id._serialized})`);
@@ -58,9 +58,9 @@ app.get('/qr', async (req, res) => {
                             console.error(`Error clearing group ${chat.name} (ID: ${chat.id._serialized}):`, err);
                         }
                     }
-                    
+
                     await msg.reply(`Successfully cleared ${clearedCount} groups. Group details:\n` +
-                                    groupChats.map(chat => `${chat.name} (ID: ${chat.id._serialized})`).join('\n'));
+                        groupChats.map(chat => `${chat.name} (ID: ${chat.id._serialized})`).join('\n'));
                     console.log('Finished clearing groups');
                 } catch (error) {
                     console.error('Error clearing groups:', error);
@@ -70,31 +70,37 @@ app.get('/qr', async (req, res) => {
         });
 
         client.on('ready', async () => {
-            console.log('Client is ready! Send !cleargroups to start clearing');
+            console.log('Client is ready!');
             clientInstance = client;
-
-            // Fetch groups and notify the client
+        
             try {
-                const chats = await client.getChats();
-                const groupChats = chats.filter(chat => chat.id._serialized.endsWith('@g.us'));
-                console.log('Sending group list to client');
-                app.locals.groupChats = groupChats.map(chat => ({ id: chat.id._serialized, name: chat.name }));
+                console.log('Start loading groups...');
+                const startTime = Date.now();
+                
+                const groups = await client.getGroupsFromStore();
+                
+                const durationInSeconds = (Date.now() - startTime) / 1000;
+                console.log(`Groups loaded (${groups.length}) in ${durationInSeconds} seconds`);
+                
+                // שמירת הקבוצות ושליחת אירוע מיד
+                app.locals.groupChats = groups;
                 eventEmitter.emit('client_ready');
+                
             } catch (error) {
                 console.error('Error fetching groups:', error);
             }
         });
-
+        
         console.log('Initializing client...');
         client.on('loading_screen', (percent, message) => {
             console.log('LOADING SCREEN', percent, message);
         });
-        
+
         client.on('authenticated', () => {
             console.log('AUTHENTICATED');
             eventEmitter.emit('authenticated');
         });
-        
+
         client.on('auth_failure', msg => {
             console.error('AUTHENTICATION FAILURE', msg);
         });
@@ -133,15 +139,15 @@ app.get('/groups', async (req, res) => {
         if (!clientInstance) {
             return res.status(400).json({ error: 'Client not initialized' });
         }
-        const chats = await clientInstance.getChats();
-        const groupChats = chats.filter(chat => chat.id._serialized.endsWith('@g.us'));
-        res.json(groupChats.map(chat => ({ id: chat.id._serialized, name: chat.name })));
+        const groups = await clientInstance.getGroupsFromStore();
+        console.log(`Sending ${groups.length} groups to client`);
+        res.json(groups);
     } catch (error) {
         console.error('Error fetching groups:', error);
         res.status(500).json({ error: error.message });
     }
 });
-    
+
 app.post('/clear-groups', async (req, res) => {
     try {
         if (!clientInstance) {

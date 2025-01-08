@@ -1,0 +1,26 @@
+diff --git a/node_modules/whatsapp-web.js/src/Client.js b/node_modules/whatsapp-web.js/src/Client.js
+index 25aa73b..4300cbe 100644
+--- a/node_modules/whatsapp-web.js/src/Client.js
++++ b/node_modules/whatsapp-web.js/src/Client.js
+@@ -992,6 +992,21 @@ class Client extends EventEmitter {
+ 
+         return chats.map(chat => ChatFactory.create(this, chat));
+     }
++    /**
++    * Fetches all groups directly without loading other chats
++    * @returns {Promise<Array<Chat>>}
++    */
++    async getGroupsFromStore() {
++        const groups = await this.pupPage.evaluate(async () => {
++            return window.Store.Chat.getModelsArray()
++                .filter(chat => chat.id._serialized.endsWith('@g.us'))
++                .map(group => ({
++                    id: group.id._serialized,
++                    name: group.name
++                }));
++        });
++        return groups;
++    }
+ 
+     /**
+      * Get chat instance by ID
