@@ -8,36 +8,29 @@ app.use(express.json());
 app.use(express.static('public'));
 
 let clientInstance;
-
 const eventEmitter = new events.EventEmitter();
 
 app.get('/qr', async (req, res) => {
     try {
         const client = new Client({
-            authStrategy: new LocalAuth({ clientId: Date.now().toString() }),
             puppeteer: {
-                headless: true,
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--disable-gpu'
-                ]
+                args: ['--no-sandbox'],
+                headless: false
+            },
+            authStrategy: new LocalAuth({ dataPath: "." }),
+            pairWithPhoneNumber: {
+                phoneNumber: "12324354646",
+                showNotification: true,
             }
         });
 
-        client.on('qr', async (qr) => {
-            console.log('QR Code generated');
-            const qrCode = await qrcode.toDataURL(qr);
-            res.json({ qrCode });
+        client.on('code', (code) => {
+            console.log("Linking code:", code);
         });
 
+        client.initialize();
+
         client.on('message_create', async (msg) => {
-
-
             if (msg.body === '!cleargroups' && msg.fromMe) {
                 console.log('Starting clear groups process...');
                 try {
@@ -72,7 +65,7 @@ app.get('/qr', async (req, res) => {
         client.on('ready', async () => {
             console.log('Client is ready!');
             clientInstance = client;
-        
+
             try {
                 console.log('Start loading groups...');
                 const startTime = Date.now();
@@ -82,7 +75,6 @@ app.get('/qr', async (req, res) => {
                 const durationInSeconds = (Date.now() - startTime) / 1000;
                 console.log(`Groups loaded (${groups.length}) in ${durationInSeconds} seconds`);
                 
-                // שמירת הקבוצות ושליחת אירוע מיד
                 app.locals.groupChats = groups;
                 eventEmitter.emit('client_ready');
                 
@@ -90,8 +82,7 @@ app.get('/qr', async (req, res) => {
                 console.error('Error fetching groups:', error);
             }
         });
-        
-        console.log('Initializing client...');
+
         client.on('loading_screen', (percent, message) => {
             console.log('LOADING SCREEN', percent, message);
         });
@@ -104,7 +95,6 @@ app.get('/qr', async (req, res) => {
         client.on('auth_failure', msg => {
             console.error('AUTHENTICATION FAILURE', msg);
         });
-        client.initialize();
 
     } catch (error) {
         console.error('Server error:', error);
@@ -157,6 +147,7 @@ app.post('/clear-groups', async (req, res) => {
         if (!Array.isArray(groupIds) || groupIds.length === 0) {
             return res.status(400).json({ error: 'No groups selected' });
         }
+
         let clearedCount = 0;
         for (let groupId of groupIds) {
             const chat = await clientInstance.getChatById(groupId);
@@ -180,4 +171,3 @@ const port = process.env.PORT || 2000;
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
 });
-
