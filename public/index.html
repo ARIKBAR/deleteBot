@@ -9,7 +9,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: space-evenly;
             height: 100vh;
             margin: 0;
             background-color: #f0f0f0;
@@ -23,6 +23,7 @@
             max-width: 400px;
             padding: 20px;
             box-sizing: border-box;
+            margin-top: 20px;
         }
         h1 {
             font-size: 1.5em;
@@ -50,22 +51,6 @@
             margin: 20px 0;
             font-size: 1.2em;
             color: #075e54;
-        }
-        #progressBar {
-            display: none;
-            width: 100%;
-            background-color: #f3f3f3;
-            border-radius: 5px;
-            overflow: hidden;
-            margin: 20px 0;
-        }
-        #progressBar div {
-            width: 0;
-            height: 20px;
-            background-color: #25d366;
-            text-align: center;
-            line-height: 20px;
-            color: white;
         }
         #groups {
             display: none;
@@ -112,14 +97,15 @@
 <body>
     <div class="container">
         <h1>ניקוי קבוצות וואטסאפ</h1>
-        <p>1. סרוק את הקוד QR עם הוואטסאפ שלך</p>
-        <p>2. המתן עד לטעינת רשימת קבוצות הוואטסאפ שלך</p>
+        <div id="instructions">
+            <p>1. סרוק את הקוד QR עם הוואטסאפ שלך</p>
+            <p>2. המתן עד לטעינת רשימת קבוצות הוואטסאפ שלך</p>
+        </div>
         <div id="qrcode"></div>
         <div id="status"></div>
         <div id="loading">טוען קבוצות...</div>
-        <div id="progressBar"><div></div></div>
         <div id="groups">
-            <h2>רשימת קבוצות</h2>
+            <h2 style="display: flex; justify-content: center;">רשימת קבוצות</h2>
             <button id="selectAllGroups">בחר הכל</button>
             <ul id="groupList"></ul>
             <button id="clearSelectedGroups">מחק קבוצות נבחרות</button>
@@ -127,133 +113,135 @@
     </div>
 
     <script>
-       fetch('/qr')
-    .then(response => {
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (data.error) {
-            throw new Error(data.error);
-        }
-        document.getElementById('qrcode').innerHTML = 
-            `<img src="${data.qrCode}" alt="QR Code">`;
-        document.getElementById('status').innerText = 'ממתין לסריקה...';
-    })
-    .catch(err => {
-        console.error('Error:', err);
-        document.getElementById('status').innerText = 'אירעה שגיאה: ' + err.message;
-    });
+        const eventSource = new EventSource('/events');
+        let cachedGroups = null;
 
-    async function fetchGroups() {
-        try {
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('progressBar').style.display = 'block';
-            const response = await fetch('/groups');
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
+        fetch('/qr')
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) throw new Error(data.error);
+                document.getElementById('qrcode').innerHTML = 
+                    `<img src="${data.qrCode}" alt="QR Code">`;
+                document.getElementById('status').innerText = 'ממתין לסריקה...';
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                document.getElementById('status').innerText = 'אירעה שגיאה: ' + err.message;
+            });
+
+        async function fetchGroups() {
+            console.time('fetchGroups');
+            try {
+                document.getElementById('loading').style.display = 'block';
+                
+                if (cachedGroups) {
+                    console.log('Using cached groups');
+                    displayGroups(cachedGroups);
+                    return;
+                }
+
+                const response = await fetch('/groups', {
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                });
+                
+                if (!response.ok) throw new Error('Network response was not ok');
+                const groups = await response.json();
+                
+                cachedGroups = groups;
+                console.timeEnd('fetchGroups');
+                displayGroups(groups);
+            } catch (err) {
+                console.error('Error:', err);
+                document.getElementById('status').innerText = 'אירעה שגיאה: ' + err.message;
+            } finally {
+                document.getElementById('loading').style.display = 'none';
             }
-            const groups = await response.json();
+        }
+
+        function displayGroups(groups) {
+            console.time('displayGroups');
             const groupList = document.getElementById('groupList');
             groupList.innerHTML = '';
-            groups.forEach(group => {
-                const li = document.createElement('li');
-                li.innerHTML = `<input type="checkbox" class="groupCheckbox" value="${group.id}"> ${group.name}`;
-                groupList.appendChild(li);
-            });
+            
+            const fragment = document.createDocumentFragment();
+            const template = document.createElement('template');
+            
+            const html = groups.map(group => 
+                `<li><input type="checkbox" class="groupCheckbox" value="${group.id}"> ${group.name}</li>`
+            ).join('');
+            
+            template.innerHTML = html;
+            fragment.appendChild(template.content);
+            groupList.appendChild(fragment);
+            
             document.getElementById('groups').style.display = 'block';
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('progressBar').style.display = 'none';
-            document.getElementById('status').innerText = 'הקבוצות נטענו בהצלחה';
-        } catch (err) {
-            console.error('Error:', err);
-            document.getElementById('status').innerText = 'אירעה שגיאה: ' + err.message;
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('progressBar').style.display = 'none';
+            document.getElementById('status').innerText = `נטענו ${groups.length} קבוצות בהצלחה`;
+            console.timeEnd('displayGroups');
         }
-    }
 
-    let allSelected = false;
-    document.getElementById('selectAllGroups').addEventListener('click', () => {
-        const checkboxes = document.querySelectorAll('.groupCheckbox');
-        allSelected = !allSelected;
-        checkboxes.forEach(checkbox => checkbox.checked = allSelected);
-        document.getElementById('selectAllGroups').innerText = allSelected ? 'בטל בחירה' : 'בחר הכל';
-    });
-
-    document.getElementById('clearSelectedGroups').addEventListener('click', async () => {
-        const selectedGroups = Array.from(document.querySelectorAll('.groupCheckbox:checked')).map(cb => cb.value);
-        if (selectedGroups.length === 0) {
-            alert('לא נבחרו קבוצות למחיקה');
-            return;
-        }
-        try {
-            const response = await fetch('/clear-groups', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ groupIds: selectedGroups })
-            });
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
+        eventSource.onmessage = function(event) {
+            if (event.data === 'client_ready') {
+                document.getElementById('qrcode').style.display = 'none';
+                document.getElementById('status').style.display = 'none';
+                document.getElementById('instructions').style.display = 'none';
+                fetchGroups();
             }
-            const result = await response.json();
-            alert(result.message);
-            fetchGroups(); // Refresh the group list
-        } catch (err) {
-            console.error('Error:', err);
-            alert('אירעה שגיאה: ' + err.message);
-        }
-    });
+            if (event.data === 'authenticated') {
+                document.getElementById('qrcode').style.display = 'none';
+                document.getElementById('status').style.display = 'none';
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('instructions').style.display = 'none';
 
-    // Call fetchGroups when client is ready
-    const eventSource = new EventSource('/events');
-    eventSource.onmessage = function(event) {
-        if (event.data === 'client_ready') {
-            document.getElementById('qrcode').style.display = 'none';
-            document.getElementById('status').style.display = 'none';
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('progressBar').style.display = 'block';
-            let progress = 0;
-            const progressBar = document.getElementById('progressBar').firstElementChild;
-            const interval = setInterval(() => {
-                if (progress >= 100) {
-                    clearInterval(interval);
-                } else {
-                    progress += 3.33; // 3.33% every 300ms to reach 100% in 30 seconds
-                    progressBar.style.width = progress + '%';
-                    progressBar.innerText = Math.round(progress) + '%';
-                }
-            }, 300);
-            fetchGroups().then(() => clearInterval(interval));
-        }
-        if (event.data === 'authenticated') {
-            document.getElementById('qrcode').style.display = 'none';
-            document.getElementById('status').style.display = 'none';
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('progressBar').style.display = 'block';
-            let progress = 0;
-            const progressBar = document.getElementById('progressBar').firstElementChild;
-            const interval = setInterval(() => {
-                if (progress >= 100) {
-                    clearInterval(interval);
-                } else {
-                    progress += 1.7; // 1.7% every 300ms to reach 100% in 30 seconds
-                    progressBar.style.width = progress + '%';
-                    progressBar.innerText = Math.round(progress) + '%';
-                }
-            }, 300);
-        }
-        if (event.data.startsWith('progress')) {
-            const percent = event.data.split(' ')[1];
-            const progressBar = document.getElementById('progressBar').firstElementChild;
-            progressBar.style.width = percent + '%';
-            progressBar.innerText = percent + '%';
-        }
-    };
+            }
+        };
+
+        let allSelected = false;
+        document.getElementById('selectAllGroups').addEventListener('click', () => {
+            const checkboxes = document.querySelectorAll('.groupCheckbox');
+            allSelected = !allSelected;
+            checkboxes.forEach(checkbox => checkbox.checked = allSelected);
+            document.getElementById('selectAllGroups').innerText = 
+                allSelected ? 'בטל בחירה' : 'בחר הכל';
+        });
+
+        document.getElementById('clearSelectedGroups').addEventListener('click', async () => {
+            const selectedGroups = Array.from(document.querySelectorAll('.groupCheckbox:checked'))
+                .map(cb => cb.value);
+
+            if (selectedGroups.length === 0) {
+                alert('לא נבחרו קבוצות למחיקה');
+                return;
+            }
+
+            if (!confirm('האם אתה בטוח שברצונך למחוק את הקבוצות שנבחרו?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/clear-groups', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ groupIds: selectedGroups })
+                });
+
+                if (!response.ok) throw new Error('Network response was not ok');
+                
+                const result = await response.json();
+                alert(result.message);
+                // Clear cache and fetch fresh groups
+                cachedGroups = null;
+                fetchGroups();
+            } catch (err) {
+                console.error('Error:', err);
+                alert('אירעה שגיאה: ' + err.message);
+            }
+        });
     </script>
 </body>
 </html>
