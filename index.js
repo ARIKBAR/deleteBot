@@ -1,5 +1,7 @@
 const ngrok = require('ngrok');
 const express = require('express');
+const cors = require('cors'); 
+
 require('dotenv').config();
 const { Client, LocalAuth,RemoteAuth  } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
@@ -17,6 +19,9 @@ pluginStealth.enabledEvasions.delete('navigator.plugins');
 puppeteer.use(pluginStealth);
 
 const app = express();
+app.use(cors()); 
+// app.use(express.urlencoded({ extended: true }));
+
 app.use(express.json());
 app.use(express.static('public'));
 
