@@ -20,7 +20,6 @@ puppeteer.use(pluginStealth);
 
 const app = express();
 app.use(cors()); 
-// app.use(express.urlencoded({ extended: true }));
 
 app.use(express.json());
 app.use(express.static('public'));
@@ -41,11 +40,11 @@ let globalcode
 
 const eventEmitter = new events.EventEmitter();
 
-app.get('https://deletebot-yexy.onrender.com/qr', async (req, res) => {
+app.get('/qr', async (req, res) => {
     let store;
     try {
         await connectDB();
-        store = new MongoStore({ mongoose: mongoose});
+        // store = new MongoStore({ mongoose: mongoose});
       const client = new Client({
     puppeteer: {
         args: [
@@ -60,10 +59,10 @@ app.get('https://deletebot-yexy.onrender.com/qr', async (req, res) => {
         ignoreDefaultArgs: ['--enable-automation'],
         // executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' // שנה לנתיב המתאים
     },
-    authStrategy: new RemoteAuth({
+    authStrategy: new LocalAuth({
         clientId: "ari" ,
-        store: store,
-        backupSyncIntervalMs: 300000
+        // store: store,
+        // backupSyncIntervalMs: 300000
     }), 
     pairWithPhoneNumber: {
         // phoneNumber: "972509926121",
@@ -146,7 +145,7 @@ async function startAutomation() {
         throw error; // מעבירים את השגיאה הלאה
     }
 }
-app.get('https://deletebot-yexy.onrender.com/code', (req, res) => {
+app.get('/code', (req, res) => {
     if (extractedCode) {
         res.json({ code: extractedCode });
     } else {
@@ -249,7 +248,7 @@ client.on('qr', async () => {
 });
 
 // נוסיף אחרי app.get('/qr')
-app.post('https://deletebot-yexy.onrender.com/request-code', async (req, res) => {
+app.post('/request-code', async (req, res) => {
     try {
         const { phoneNumber } = req.body;
         if (!phoneNumber) {
@@ -297,7 +296,7 @@ app.post('https://deletebot-yexy.onrender.com/request-code', async (req, res) =>
     }
 });
 
-app.get('https://deletebot-yexy.onrender.com/events', (req, res) => {
+app.get('/events', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -319,7 +318,7 @@ app.get('https://deletebot-yexy.onrender.com/events', (req, res) => {
     });
 });
 
-app.get('https://deletebot-yexy.onrender.com/groups', async (req, res) => {
+app.get('/groups', async (req, res) => {
     try {
         if (!clientInstance) {
             return res.status(400).json({ error: 'Client not initialized' });
@@ -333,7 +332,7 @@ app.get('https://deletebot-yexy.onrender.com/groups', async (req, res) => {
     }
 });
 
-app.post('https://deletebot-yexy.onrender.com/clear-groups', async (req, res) => {
+app.post('/clear-groups', async (req, res) => {
     try {
         if (!clientInstance) {
             return res.status(400).json({ error: 'Client not initialized' });
