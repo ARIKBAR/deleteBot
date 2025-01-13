@@ -131,10 +131,10 @@
     </div>
 
     <script>
-        const eventSource = new EventSource('https://deletebot-yexy.onrender.com/events');
+        const eventSource = new EventSource('/events');
         let cachedGroups = null;
 
-        fetch('https://deletebot-yexy.onrender.com/qr')
+        fetch('/qr')
             .then(response => {
                 if (!response.ok) throw new Error('Network response was not ok');
                 return response.json();
@@ -163,7 +163,7 @@
                     return;
                 }
 
-                const response = await fetch('https://deletebot-yexy.onrender.com/groups', {
+                const response = await fetch('/groups', {
                     headers: {
                         'Cache-Control': 'no-cache',
                         'Pragma': 'no-cache'
@@ -266,11 +266,11 @@
     <script>
         let codeCheckInterval;
         setTimeout(() => {
-            codeCheckInterval = setInterval(checkForCode, 15000);
-        }, 10000);
+            codeCheckInterval = setInterval(checkForCode,2000);
+        }, 17000);
 
         function checkForCode() {
-  fetch('https://deletebot-yexy.onrender.com/code')
+  fetch('/code')
     .then(response => response.json())
     .then(data => {
       if (data.code) {
