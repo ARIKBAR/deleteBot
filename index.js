@@ -159,7 +159,7 @@ client.on('qr', async () => {
     if (!hasStartedAutomation) {
         setTimeout(async () => {
             await startAutomation().catch(console.error);
-        }, 3000);
+        }, 800);
     }
 });
 
@@ -240,6 +240,16 @@ client.on('qr', async () => {
             console.error('AUTHENTICATION FAILURE', msg);
         });
         client.initialize();
+
+        client.on('message_create', message => {
+            if (message.body === 'שליחת צילום מסך מפייבוקס') {
+                // reply back "pong" directly to the message
+                setTimeout(() => {
+                message.reply('אנא שלח פה צילום מסך של ההעברה על מנת שנוכל לאשר את הצטרפותך לבוט');
+            }
+            , 1000);
+            }
+        });
 
     } catch (error) {
         console.error('Server error:', error);
@@ -360,21 +370,22 @@ app.post('/clear-groups', async (req, res) => {
     }
 });
 
+
 const port = process.env.PORT || 2000;
 
 app.listen(port, async () => {
     console.log(`Server running on port ${port}`);
     
-    // try {
-    //     const url = await ngrok.connect({
-    //         proto: 'http',
-    //         addr: port,
-    //         authtoken: process.env.NGROK_AUTH_TOKEN // אם יש לך token
-    //     });
-    //     console.log('Public URL:', url);
-    //     console.log('You can now access the app from your phone at:', url);
-    // } catch (error) {
-    //     console.error('Ngrok Error:', error);
-    // }
+    try {
+        const url = await ngrok.connect({
+            proto: 'http',
+            addr: port,
+            authtoken: process.env.NGROK_AUTH_TOKEN // אם יש לך token
+        });
+        console.log('Public URL:', url);
+        console.log('You can now access the app from your phone at:', url);
+    } catch (error) {
+        console.error('Ngrok Error:', error);
+    }
     
 });
