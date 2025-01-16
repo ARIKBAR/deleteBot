@@ -2,139 +2,567 @@
 <html>
 
 <head>
-    <title>ניקוי קבוצות וואטסאפ</title>
+    <title>ניהול קבוצות וואטסאפ</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
     <style>
+        :root {
+            --primary-color: #25D366;
+            --secondary-color: #128C7E;
+            --bg-color: #f5f6f8;
+            --text-color: #2c3e50;
+            --border-radius: 12px;
+            --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            direction: rtl;
+            min-height: 100vh;
+        }
+
+        .app-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            min-height: 100vh;
+            position: relative;
+            padding-bottom: 70px;
+        }
+
+        .header {
+            background: var(--primary-color);
+            color: white;
+            padding: 16px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: var(--box-shadow);
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            margin: 0;
+        }
+
+        .content {
+            padding: 20px;
+            position: relative;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            max-width: 600px;
+            margin: 0 auto;
+            z-index: 1000;
+        }
+
+        .nav-item {
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: space-evenly;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f0f0;
-            direction: rtl;
+            color: #666;
+            text-decoration: none;
+            font-size: 0.8rem;
+            padding: 8px 12px;
+            border-radius: 8px;
+            transition: var(--transition);
+            cursor: pointer;
         }
 
-        .container {
-            background-color: #ffffff;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 400px;
+        .nav-item.active {
+            color: var(--primary-color);
+            background: rgba(37, 211, 102, 0.1);
+        }
+
+        .nav-item svg {
+            width: 24px;
+            height: 24px;
+            margin-bottom: 4px;
+        }
+
+        #instructions {
+            background: #f8f9fa;
             padding: 20px;
-            box-sizing: border-box;
-            margin-top: 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 24px;
         }
 
-        h1 {
-            font-size: 1.5em;
-            color: #075e54;
-            text-align: center;
+        #instructions p {
+            margin: 12px 0;
+            padding-right: 20px;
+            position: relative;
+            font-size: 0.95rem;
+            color: #666;
         }
 
-        p {
-            font-size: 1em;
-            color: #4a4a4a;
-            text-align: center;
-        }
-
-        #status {
-            margin: 20px 0;
-            font-weight: bold;
-            text-align: center;
-            color: #ff0000;
+        #instructions p::before {
+            content: '•';
+            position: absolute;
+            right: 0;
+            color: var(--primary-color);
         }
 
         #qrcode {
+            background: white;
+            padding: 20px;
+            border-radius: var(--border-radius);
+            margin: 20px 0;
             text-align: center;
+        }
+
+        #qrcode img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .code-container {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: var(--border-radius);
             margin: 20px 0;
         }
 
-        #loading {
-            display: none;
-            text-align: center;
-            margin: 20px 0;
-            font-size: 1.2em;
-            color: #075e54;
+        .code-display {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin: 16px 0;
+            direction: ltr;
         }
 
-        #groups {
+        .code-digit {
+            background: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 1.2rem;
+            min-width: 40px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .copy-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: var(--border-radius);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: var(--transition);
+            margin-top: 12px;
+            width: 100%;
+        }
+
+        .copy-button:hover {
+            background: #0056b3;
+        }
+
+        .phone-form {
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+        }
+
+        .phone-input-container {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+        }
+
+        .prefix {
+            background: #f1f1f1;
+            padding: 12px;
+            color: #666;
+            border-left: 1px solid #ddd;
+        }
+
+        .phone-input {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            outline: none;
+            font-size: 1rem;
+        }
+
+        .phone-input:focus {
+            background: #fff;
+        }
+
+        .error-message {
+            color: #dc3545;
+            font-size: 0.9rem;
+            margin-top: 5px;
             display: none;
         }
 
         #groupList {
             list-style: none;
-            padding: 0;
-            font-size: 1.2em;
+            max-height: calc(100vh - 300px);
+            overflow-y: auto;
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: var(--border-radius);
         }
 
         #groupList li {
             display: flex;
             align-items: center;
-            padding: 10px;
-            border-bottom: 1px solid #e0e0e0;
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            transition: var(--transition);
         }
 
         #groupList li:last-child {
             border-bottom: none;
         }
 
-        #groupList input[type="checkbox"] {
-            margin-right: 20px;
+        .checkbox {
             width: 20px;
             height: 20px;
-            accent-color: #25d366;
+            margin-left: 12px;
+            accent-color: var(--primary-color);
         }
 
-        #clearSelectedGroups,
-        #selectAllGroups {
-            background-color: #25d366;
-            color: #ffffff;
+        .button {
+            background: var(--primary-color);
+            color: white;
             border: none;
-            border-radius: 5px;
-            padding: 10px 20px;
-            font-size: 1em;
+            padding: 12px 20px;
+            border-radius: var(--border-radius);
+            font-weight: 500;
             cursor: pointer;
             width: 100%;
-            margin-top: 20px;
+            margin: 10px 0;
+            transition: var(--transition);
         }
 
-        #clearSelectedGroups:hover,
-        #selectAllGroups:hover {
-            background-color: #1ebe57;
+        .button:hover {
+            background: var(--secondary-color);
         }
 
-        #selectAllGroups {
-            font-size: 0.9em;
+        .textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 16px;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            resize: vertical;
+            margin: 16px 0;
+            font-family: inherit;
+        }
+
+        .datetime-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            margin: 10px 0;
+        }
+
+        #status {
+            text-align: center;
+            color: var(--secondary-color);
+            font-weight: 500;
+            margin: 16px 0;
+        }
+
+        #loading {
+            display: none;
+            text-align: center;
+            color: var(--primary-color);
+            font-weight: 500;
+            margin: 16px 0;
+        }
+
+        @media (max-width: 480px) {
+            .content {
+                padding: 16px;
+            }
+
+            .header h1 {
+                font-size: 1.3rem;
+            }
+
+            .nav-item {
+                font-size: 0.7rem;
+            }
+
+            .code-digit {
+                padding: 8px 12px;
+                font-size: 1rem;
+            }
+
+            #groupList {
+                max-height: calc(100vh - 250px);
+            }
         }
     </style>
 </head>
 
 <body>
-    <div class="container">
-        <h1>ניקוי קבוצות וואטסאפ</h1>
-        <div id="instructions">
-            <p>1.המתן להופעת קוד על המסך והעתק אותו</p>
-            <p>2.לחץ על ההודעה שקיבלת מוואטסאפ והדבק את הקוד </p>
-            <p>3. המתן עד לטעינת רשימת קבוצות הוואטסאפ שלך</p>
+    <div class="app-container">
+        <header class="header">
+            <h1>ניהול קבוצות וואטסאפ</h1>
+        </header>
+
+        <div class="content">
+            <!-- טאב התחברות -->
+            <div id="connect-tab" class="tab-content active">
+                <div id="phone-form" class="phone-form">
+                    <label for="phoneInput" class="label">הכנס את מספר הטלפון שלך:</label>
+                    <div class="phone-input-container">
+                        <span class="prefix">+972</span>
+                        <input type="tel" id="phoneInput" class="phone-input"
+                            placeholder="הכנס מספר טלפון (לדוגמה: 501234567)" pattern="[0-9]*">
+                    </div>
+                    <button id="submitPhone" class="button">התחל תהליך התחברות</button>
+                </div>
+
+                <div id="connection-process" style="display: none;">
+                    <div id="instructions">
+                        <p>המתן להופעת קוד על המסך והעתק אותו</p>
+                        <p>לחץ על ההודעה שקיבלת מוואטסאפ והדבק את הקוד</p>
+                        <p>המתן עד לטעינת רשימת קבוצות הוואטסאפ שלך</p>
+                    </div>
+                    <div id="qrcode"></div>
+                    <div id="status"></div>
+                    <div id="loading">טוען קבוצות...</div>
+                </div>
+            </div>
+
+            <div id="connect-tab" class="tab-content active">
+                <div id="instructions">
+                    <p>המתן להופעת קוד על המסך והעתק אותו</p>
+                    <p>לחץ על ההודעה שקיבלת מוואטסאפ והדבק את הקוד</p>
+                    <p>המתן עד לטעינת רשימת קבוצות הוואטסאפ שלך</p>
+                </div>
+                <div id="qrcode"></div>
+                <div id="status"></div>
+                <div id="loading">טוען קבוצות...</div>
+            </div>
+
+            <!-- טאב קבוצות -->
+            <div id="groups-tab" class="tab-content">
+                <button id="selectAllGroups" class="button">בחר הכל</button>
+                <ul id="groupList"></ul>
+                <button id="clearSelectedGroups" class="button">מחק הודעות בקבוצות נבחרות</button>
+            </div>
+
+            <!-- טאב הודעות -->
+            <div id="message-tab" class="tab-content">
+                <textarea id="messageText" class="textarea" placeholder="הכנס את תוכן ההודעה כאן..."></textarea>
+
+                <div>
+                    <label>תזמון שליחה (אופציונלי):</label>
+                    <input type="datetime-local" id="scheduleTime" class="datetime-input">
+                </div>
+
+                <button id="sendMessage" class="button">
+                    שלח הודעה לקבוצות נבחרות
+                </button>
+            </div>
         </div>
-        <div id="qrcode"></div>
-        <div id="status"></div>
-        <div id="loading">טוען קבוצות...</div>
-        <div id="groups">
-            <h2 style="display: flex; justify-content: center;">רשימת קבוצות</h2>
-            <button id="selectAllGroups">בחר הכל</button>
-            <ul id="groupList"></ul>
-            <button id="clearSelectedGroups">מחק קבוצות נבחרות</button>
-        </div>
+
+        <!-- תפריט ניווט -->
+        <nav class="bottom-nav">
+            <a class="nav-item active" data-tab="connect-tab">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="16" height="16" x="4" y="4" rx="2" />
+                    <path d="M9 9h6v6H9z" />
+                    <path d="M15 2v2" />
+                    <path d="M15 20v2" />
+                    <path d="M2 15h2" />
+                    <path d="M20 15h2" />
+                </svg>
+                התחברות
+            </a>
+            <a class="nav-item" data-tab="groups-tab">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                קבוצות
+            </a>
+            <a class="nav-item" data-tab="message-tab">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                הודעות
+            </a>
+        </nav>
     </div>
 
     <script>
         const eventSource = new EventSource('/events');
         let cachedGroups = null;
 
+        // ניהול טאבים
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tabId = item.getAttribute('data-tab');
+
+                // עדכון טאב פעיל
+                document.querySelectorAll('.tab-content').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                document.getElementById(tabId).classList.add('active');
+
+                // עדכון ניווט פעיל
+                document.querySelectorAll('.nav-item').forEach(navItem => {
+                    navItem.classList.remove('active');
+                });
+                item.classList.add('active');
+            });
+        });
+
+        // בדיקת קוד
+        let codeReceived = false;
+        let codeCheckInterval;
+
+        setTimeout(() => {
+            codeCheckInterval = setInterval(checkForCode, 2000);
+        }, 17000);
+
+        function checkForCode() {
+            if (codeReceived) {
+                clearInterval(codeCheckInterval);
+                return;
+            }
+
+            fetch('/code')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code) {
+                        codeReceived = true;
+                        clearInterval(codeCheckInterval);
+
+                        const codeStr = String(data.code);
+
+                        // יצירת HTML לתצוגת הקוד
+                        const codeHtml = codeStr.split('').map((digit, index) => `
+                    <div class="code-digit">
+                        ${digit}
+                    </div>${index === 3 ? '<div class="code-separator">-</div>' : ''}`
+                        ).join('');
+
+                        // הצגת הקוד על המסך
+                        document.getElementById('qrcode').innerHTML = `
+                    <div class="code-container">
+                        <div class="code-display">
+                            ${codeHtml}
+                        </div>
+                        <button id="copyCodeBtn" class="copy-button">העתק קוד</button>
+                    </div>`;
+
+                        document.getElementById('status').innerText = 'השתמש בקוד זה להתחברות';
+
+                        document.getElementById('copyCodeBtn').addEventListener('click', () => {
+                            navigator.clipboard.writeText(codeStr)
+                                .then(() => alert('הקוד הועתק בהצלחה!'))
+                                .catch(err => console.error('Error copying code:', err));
+                        });
+                    }
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    if (codeReceived) {
+                        clearInterval(codeCheckInterval);
+                    }
+                });
+        }
+        // הוספת אירוע למשלוח מספר הטלפון
+        document.getElementById('submitPhone').addEventListener('click', async () => {
+            const phoneInput = document.getElementById('phoneInput');
+            const phoneNumber = phoneInput.value.trim();
+
+            // וולידציה בסיסית
+            if (!phoneNumber || phoneNumber.length < 9) {
+                alert('נא להזין מספר טלפון תקין');
+                return;
+            }
+
+            try {
+                // שליחת מספר הטלפון לשרת
+                const response = await fetch('/start-connection', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phoneNumber })
+                });
+
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                // מעבר לתצוגת תהליך ההתחברות
+                document.getElementById('phone-form').style.display = 'none';
+                document.getElementById('connection-process').style.display = 'block';
+
+                // התחלת תהליך בדיקת הקוד
+                setTimeout(() => {
+                    codeCheckInterval = setInterval(checkForCode, 2000);
+                }, 17000);
+
+            } catch (err) {
+                console.error('Error:', err);
+                alert('אירעה שגיאה בתהליך ההתחברות');
+            }
+        });
+        // התחברות ראשונית
         fetch('/qr')
             .then(response => {
                 if (!response.ok) throw new Error('Network response was not ok');
@@ -151,8 +579,7 @@
                 document.getElementById('status').innerText = 'אירעה שגיאה: ' + err.message;
             });
 
-
-
+        // טעינת קבוצות
         async function fetchGroups() {
             console.time('fetchGroups');
             try {
@@ -185,6 +612,7 @@
             }
         }
 
+        // הצגת קבוצות
         function displayGroups(groups) {
             console.time('displayGroups');
             const groupList = document.getElementById('groupList');
@@ -206,6 +634,7 @@
             console.timeEnd('displayGroups');
         }
 
+        // אירועי EventSource
         eventSource.onmessage = function (event) {
             if (event.data === 'client_ready') {
                 document.getElementById('qrcode').style.display = 'none';
@@ -218,10 +647,10 @@
                 document.getElementById('status').style.display = 'none';
                 document.getElementById('loading').style.display = 'block';
                 document.getElementById('instructions').style.display = 'none';
-
             }
         };
 
+        // בחירת כל הקבוצות
         let allSelected = false;
         document.getElementById('selectAllGroups').addEventListener('click', () => {
             const checkboxes = document.querySelectorAll('.groupCheckbox');
@@ -231,6 +660,7 @@
                 allSelected ? 'בטל בחירה' : 'בחר הכל';
         });
 
+        // מחיקת קבוצות
         document.getElementById('clearSelectedGroups').addEventListener('click', async () => {
             const selectedGroups = Array.from(document.querySelectorAll('.groupCheckbox:checked'))
                 .map(cb => cb.value);
@@ -255,7 +685,6 @@
 
                 const result = await response.json();
                 alert(result.message);
-                // Clear cache and fetch fresh groups
                 cachedGroups = null;
                 fetchGroups();
             } catch (err) {
@@ -263,81 +692,62 @@
                 alert('אירעה שגיאה: ' + err.message);
             }
         });
-    </script>
-    <script>
-        let codeCheckInterval;
-        setTimeout(() => {
-            codeCheckInterval = setInterval(checkForCode,2000);
-        }, 17000);
 
-        function checkForCode() {
-  fetch('/code')
-    .then(response => response.json())
-    .then(data => {
-      if (data.code) {
-        // ממירים את הקוד למחרוזת אם הוא מספר
-        
-        const codeStr = String(data.code);
-        
-        // יוצרים HTML עבור כל ספרה בקוד עם מקף אחרי 4 הספרות הראשונות
-        const codeHtml = codeStr.split('').map((digit, index) => `
-          <div style="
-              display: inline-block;
-              font-size: 20px;
-              font-family: monospace;
-              background: #f5f5f5;
-              padding: 8px 12px;
-              border-radius: 6px;
-              margin: 5px 2px;
-              text-align: center;
-              min-width: 30px;
-          ">
-              ${digit}
-          </div>${index === 3 ? '<div style="display: inline-block; font-size: 20px; margin: 0 5px;">-</div>' : ''}
-        `).join('');
-        
-        // מוסיפים את הקוד עם כפתור ההעתקה ל-HTML
-        document.getElementById('qrcode').innerHTML = `
-          <div style="
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              gap: 5px;
-              direction: ltr;
-              flex-wrap: wrap;
-          ">
-            ${codeHtml}
-            <button id="copyCodeBtn" style="
-                padding: 8px 16px;
-                font-size: 14px;
-                border: none;
-                border-radius: 6px;
-                background: #007bff;
-                color: white;
-                cursor: pointer;
-            ">העתק קוד</button>
-          </div>`;
-        
-        document.getElementById('status').innerText = 'השתמש בקוד זה להתחברות';
-        
-        // מוסיפים פעולה לכפתור ההעתקה
-        document.getElementById('copyCodeBtn').addEventListener('click', () => {
-          navigator.clipboard.writeText(codeStr)
-            .then(() => alert('הקוד הועתק בהצלחה!'))
-            .catch(err => console.error('Error copying code:', err));
+        // שליחת הודעות
+        document.getElementById('sendMessage').addEventListener('click', async () => {
+            const selectedGroups = Array.from(document.querySelectorAll('.groupCheckbox:checked'))
+                .map(cb => cb.value);
+
+            if (selectedGroups.length === 0) {
+                alert('לא נבחרו קבוצות לשליחת ההודעה');
+                return;
+            }
+
+            const messageText = document.getElementById('messageText').value.trim();
+            if (!messageText) {
+                alert('נא להזין תוכן להודעה');
+                return;
+            }
+
+            const scheduleTime = document.getElementById('scheduleTime').value;
+            let scheduledTimestamp = null;
+
+            if (scheduleTime) {
+                scheduledTimestamp = new Date(scheduleTime).getTime();
+                if (scheduledTimestamp < Date.now()) {
+                    alert('לא ניתן לתזמן הודעה לזמן שכבר עבר');
+                    return;
+                }
+            }
+
+            if (!confirm('האם אתה בטוח שברצונך לשלוח את ההודעה לקבוצות שנבחרו?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/send-message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        groupIds: selectedGroups,
+                        message: messageText,
+                        scheduleTime: scheduledTimestamp
+                    })
+                });
+
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                const result = await response.json();
+                alert(result.message);
+
+                document.getElementById('messageText').value = '';
+                document.getElementById('scheduleTime').value = '';
+
+            } catch (err) {
+                console.error('Error:', err);
+                alert('אירעה שגיאה בשליחת ההודעה: ' + err.message);
+            }
         });
-        
-        // מפסיקים לבדוק אחרי שמצאנו קוד
-        clearInterval(codeCheckInterval);
-      }
-    })
-    .catch(err => {
-      console.error('Error:', err);
-    });
-}
-
-
-
     </script>
 </body>
 
