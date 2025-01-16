@@ -381,16 +381,7 @@
                 </div>
             </div>
 
-            <div id="connect-tab" class="tab-content active">
-                <div id="instructions">
-                    <p>המתן להופעת קוד על המסך והעתק אותו</p>
-                    <p>לחץ על ההודעה שקיבלת מוואטסאפ והדבק את הקוד</p>
-                    <p>המתן עד לטעינת רשימת קבוצות הוואטסאפ שלך</p>
-                </div>
-                <div id="qrcode"></div>
-                <div id="status"></div>
-                <div id="loading">טוען קבוצות...</div>
-            </div>
+
 
             <!-- טאב קבוצות -->
             <div id="groups-tab" class="tab-content">
@@ -478,7 +469,7 @@
 
         setTimeout(() => {
             codeCheckInterval = setInterval(checkForCode, 2000);
-        }, 17000);
+        }, 28000);
 
         function checkForCode() {
             if (codeReceived) {
@@ -515,7 +506,7 @@
 
                         document.getElementById('copyCodeBtn').addEventListener('click', () => {
                             navigator.clipboard.writeText(codeStr)
-                                .then(() => alert('הקוד הועתק בהצלחה!'))
+                                .then()
                                 .catch(err => console.error('Error copying code:', err));
                         });
                     }
@@ -529,6 +520,7 @@
         }
         // הוספת אירוע למשלוח מספר הטלפון
         document.getElementById('submitPhone').addEventListener('click', async () => {
+            initialConnect();
             const phoneInput = document.getElementById('phoneInput');
             const phoneNumber = phoneInput.value.trim();
 
@@ -563,7 +555,9 @@
             }
         });
         // התחברות ראשונית
-        fetch('/qr')
+        async function initialConnect() {
+            try {
+                fetch('/qr')
             .then(response => {
                 if (!response.ok) throw new Error('Network response was not ok');
                 return response.json();
@@ -574,10 +568,26 @@
                     `<img src="${data.qrCode}" alt="QR Code">`;
                 document.getElementById('status').innerText = 'ממתין לסריקה...';
             })
-            .catch(err => {
+            } catch (err) {
                 console.error('Error:', err);
-                document.getElementById('status').innerText = 'אירעה שגיאה: ' + err.message;
-            });
+                alert('אירעה שגיאה בתהליך ההתחברות');
+            }
+        }
+        // fetch('/qr')
+        //     .then(response => {
+        //         if (!response.ok) throw new Error('Network response was not ok');
+        //         return response.json();
+        //     })
+        //     .then(data => {
+        //         if (data.error) throw new Error(data.error);
+        //         document.getElementById('qrcode').innerHTML =
+        //             `<img src="${data.qrCode}" alt="QR Code">`;
+        //         document.getElementById('status').innerText = 'ממתין לסריקה...';
+        //     })
+        //     .catch(err => {
+        //         console.error('Error:', err);
+        //         document.getElementById('status').innerText = 'אירעה שגיאה: ' + err.message;
+        //     });
 
         // טעינת קבוצות
         async function fetchGroups() {
