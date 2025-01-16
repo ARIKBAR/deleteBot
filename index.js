@@ -9,14 +9,14 @@ const mongoose = require('mongoose');
 const { MongoStore } = require('wwebjs-mongo');
 const events = require('events');
 const connectDB = require('./config/db');
-const puppeteer = require('puppeteer-extra');
+const puppeteer = require('puppeteer');
 // const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 
 // הגדרות מתקדמות לפלאגין Stealth
 // const pluginStealth = StealthPlugin();
 // pluginStealth.enabledEvasions.delete('chrome.runtime');
 // pluginStealth.enabledEvasions.delete('navigator.plugins');
-puppeteer.use();
+// puppeteer.use();
 
 const app = express();
 app.use(cors());
@@ -57,7 +57,6 @@ function scheduleMessage(groupId, message, timestamp) {
     scheduledMessages.set(`${groupId}-${timestamp}`, timeoutId);
 }
 
-// ואת הנתיב החדש הוסף אחרי שאר הנתיבים, לפני app.listen:
 app.post('/send-message', async (req, res) => {
     try {
         if (!clientInstance) {
