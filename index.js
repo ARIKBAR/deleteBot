@@ -185,51 +185,74 @@ app.get('/qr', async (req, res) => {
                     console.log('Automation already started, skipping...');
                     return;
                 }
-
+        
                 hasStartedAutomation = true;
+                console.log('Starting automation process...');
+        
+                // שלב 1: קבלת העמוד
                 const page = await client.pupPage;
-
                 if (!page) {
                     throw new Error('Page not available');
                 }
-
-                // הוספת הסוואות
+                console.log('Page obtained successfully');
+        
+                // שלב 2: הגדרת התנהגויות דפדפן
                 await page.evaluateOnNewDocument(() => {
                     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
                     window.navigator.chrome = { runtime: {} };
                     Object.defineProperty(navigator, 'languages', { get: () => ['he-IL', 'he'] });
                     Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
                 });
-
+                console.log('Browser behaviors set');
+        
+                // שלב 3: הגדרת User Agent
                 await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-
-                console.log('Starting automation with page...');
-                await randomDelay(2000, 4000);
-
-                const phoneButtonSelector = '[data-icon="chevron"]';
+                console.log('User agent set');
+        
+                // שלב 4: חיפוש והקלקה על כפתור הטלפון
                 console.log('Looking for phone button...');
-                await page.waitForSelector(phoneButtonSelector, { timeout: 30000 });
-                await randomDelay(500, 1500);
-                await page.click(phoneButtonSelector);
-                console.log('Clicked phone button');
-
+                await page.waitForSelector('[data-icon="chevron"]', { 
+                    timeout: 60000,
+                });
+                console.log('Phone button found');
+                
                 await randomDelay(1000, 2000);
-
+                await page.click('[data-icon="chevron"]');
+                console.log('Phone button clicked successfully');
+        
+                // שלב 5: חיפוש והזנת מספר טלפון
+                console.log('Looking for phone input...');
                 const phoneInputSelector = '.selectable-text.x1n2onr6.xy9n6vp.x1n327nk.xh8yej3.x972fbf.xcfux6l.x1qhh985.xm0m39n.xjbqb8w.x1uvtmcs.x1jchvi3.xss6m8b.xexx8yu.x4uap5.x18d9i69.xkhd6sd';
-                await page.waitForSelector(phoneInputSelector);
-                await randomDelay(500, 1500);
-                await page.type(phoneInputSelector, currentPhoneNumber, { delay: Math.random() * 100 + 50 });
-                console.log('Entered phone number');
-
+                await page.waitForSelector(phoneInputSelector, { 
+                    timeout: 60000,
+                });
+                console.log('Phone input found');
+        
                 await randomDelay(1000, 2000);
-
+                await page.type(phoneInputSelector, currentPhoneNumber, { delay: 100 });
+                console.log('Phone number entered successfully');
+        
+                // שלב 6: חיפוש והקלקה על כפתור הבא
+                console.log('Looking for next button...');
                 const nextButtonSelector = '.x889kno.x1a8lsjc.xbbxn1n.xxbr6pl.x1n2onr6.x1rg5ohu.xk50ysn.x1f6kntn.xyesn5m.x1z11no5.xjy5m1g.x1mnwbp6.x4pb5v6.x178xt8z.xm81vs4.xso031l.xy80clv.x13fuv20.xu3j5b3.x1q0q8m5.x26u7qi.x1v8p93f.xogb00i.x16stqrj.x1ftr3km.x1hl8ikr.xfagghw.x9dyr19.x9lcvmn.xbtce8p.x14v0smp.xo8ufso.xcjl5na.x1k3x3db.xuxw1ft.xv52azi';
+                await page.waitForSelector(nextButtonSelector, { 
+                    timeout: 60000,
+                });
+                console.log('Next button found');
+        
+                await randomDelay(1000, 2000);
                 await page.click(nextButtonSelector);
-                console.log('Clicked next button');
-
-                await randomDelay(3000, 5000);
-                await page.waitForSelector('div[data-link-code]');
-
+                console.log('Next button clicked successfully');
+        
+                // שלב 7: המתנה לקוד
+                console.log('Waiting for code to appear...');
+                await page.waitForSelector('div[data-link-code]', { 
+                    timeout: 60000,
+                });
+                console.log('Code element found');
+        
+                // שלב 8: חילוץ הקוד
+                console.log('Extracting code...');
                 const code = await page.evaluate(() => {
                     const codeElement = document.querySelector('div[data-link-code]');
                     if (codeElement) {
@@ -238,19 +261,20 @@ app.get('/qr', async (req, res) => {
                     }
                     return null;
                 });
-
+        
                 if (code) {
-                    console.log('Successfully extracted pairing code:', code);
-                    extractedCode = code; // שומרים את הקוד במשתנה הגלובלי
-                    return code; // מחזירים את הקוד למי שקרא לפונקציה
+                    console.log('Code extracted successfully:', code);
+                    extractedCode = code;
+                    return code;
                 } else {
                     throw new Error('Could not extract pairing code');
                 }
-
+        
             } catch (error) {
-                console.error('Error in automation:', error);
+                console.error('Error in automation process:', error);
+                console.error('Error stack:', error.stack);
                 hasStartedAutomation = false;
-                throw error; // מעבירים את השגיאה הלאה
+                throw error;
             }
         }
         app.get('/code', (req, res) => {
