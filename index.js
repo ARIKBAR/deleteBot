@@ -10,13 +10,13 @@ const { MongoStore } = require('wwebjs-mongo');
 const events = require('events');
 const connectDB = require('./config/db');
 const puppeteer = require('puppeteer-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+// const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 
 // הגדרות מתקדמות לפלאגין Stealth
-const pluginStealth = StealthPlugin();
-pluginStealth.enabledEvasions.delete('chrome.runtime');
-pluginStealth.enabledEvasions.delete('navigator.plugins');
-puppeteer.use(pluginStealth);
+// const pluginStealth = StealthPlugin();
+// pluginStealth.enabledEvasions.delete('chrome.runtime');
+// pluginStealth.enabledEvasions.delete('navigator.plugins');
+puppeteer.use();
 
 const app = express();
 app.use(cors()); 
@@ -37,8 +37,113 @@ async function randomDelay(min = 500, max = 2000) {
 
 let clientInstance;
 let globalcode
+let currentPhoneNumber = null;
 
 const eventEmitter = new events.EventEmitter();
+
+const scheduledMessages = new Map();
+
+function scheduleMessage(groupId, message, timestamp) {
+    const timeoutId = setTimeout(async () => {
+        try {
+            const chat = await clientInstance.getChatById(groupId);
+            await chat.sendMessage(message);
+            scheduledMessages.delete(`${groupId}-${timestamp}`);
+        } catch (error) {
+            console.error(`Error sending scheduled message to group ${groupId}:`, error);
+        }
+    }, timestamp - Date.now());
+
+    scheduledMessages.set(`${groupId}-${timestamp}`, timeoutId);
+}
+
+// ואת הנתיב החדש הוסף אחרי שאר הנתיבים, לפני app.listen:
+app.post('/send-message', async (req, res) => {
+    try {
+        if (!clientInstance) {
+            return res.status(400).json({ error: 'Client not initialized' });
+        }
+
+        const { groupIds, message, scheduleTime } = req.body;
+
+        if (!Array.isArray(groupIds) || groupIds.length === 0) {
+            return res.status(400).json({ error: 'No groups selected' });
+        }
+
+        if (!message) {
+            return res.status(400).json({ error: 'Message is required' });
+        }
+
+        let sentCount = 0;
+        let scheduledCount = 0;
+
+        for (let groupId of groupIds) {
+            try {
+                const chat = await clientInstance.getChatById(groupId);
+                
+                if (scheduleTime) {
+                    // תזמון ההודעה
+                    scheduleMessage(groupId, message, scheduleTime);
+                    scheduledCount++;
+                } else {
+                    // שליחה מיידית
+                    await chat.sendMessage(message);
+                    sentCount++;
+                }
+            } catch (err) {
+                console.error(`Error with group ${groupId}:`, err);
+            }
+        }
+
+        let responseMessage = '';
+        if (sentCount > 0) {
+            responseMessage += `נשלחו ${sentCount} הודעות בהצלחה. `;
+        }
+        if (scheduledCount > 0) {
+            responseMessage += `תוזמנו ${scheduledCount} הודעות לשליחה.`;
+        }
+
+        res.json({ message: responseMessage });
+    } catch (error) {
+        console.error('Error sending messages:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// הוסף את נקודת הקצה לביטול הודעות מתוזמנות (אופציונלי)
+app.post('/cancel-scheduled-messages', (req, res) => {
+    const { groupId, timestamp } = req.body;
+    const key = `${groupId}-${timestamp}`;
+    
+    if (scheduledMessages.has(key)) {
+        clearTimeout(scheduledMessages.get(key));
+        scheduledMessages.delete(key);
+        res.json({ message: 'Scheduled message cancelled successfully' });
+    } else {
+        res.status(404).json({ error: 'Scheduled message not found' });
+    }
+});
+
+app.post('/start-connection', async (req, res) => {
+    try {
+        const { phoneNumber } = req.body;
+        if (!phoneNumber) {
+            return res.status(400).json({ error: 'Phone number is required' });
+        }
+
+        // שמירת מספר הטלפון
+        currentPhoneNumber = phoneNumber;
+        
+        // שליחת תשובה חיובית
+        res.json({ success: true });
+
+        
+
+    } catch (error) {
+        console.error('Error starting connection:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 app.get('/qr', async (req, res) => {
     let store;
@@ -110,7 +215,7 @@ async function startAutomation() {
         const phoneInputSelector = '.selectable-text.x1n2onr6.xy9n6vp.x1n327nk.xh8yej3.x972fbf.xcfux6l.x1qhh985.xm0m39n.xjbqb8w.x1uvtmcs.x1jchvi3.xss6m8b.xexx8yu.x4uap5.x18d9i69.xkhd6sd';
         await page.waitForSelector(phoneInputSelector);
         await randomDelay(500, 1500);
-        await page.type(phoneInputSelector, "509926121", { delay: Math.random() * 100 + 50 });
+        await page.type(phoneInputSelector, currentPhoneNumber, { delay: Math.random() * 100 + 50 });
         console.log('Entered phone number');
 
         await randomDelay(1000, 2000);
@@ -169,9 +274,7 @@ client.on('qr', async () => {
     ;
 
     client.on('message_create', async (message) => {
-        if (message.body === 'היי') {
-            await client.sendMessage(message.from, 'היי וברכה');
-        }
+      
         
         if (message.body === '!cleargroups' && message.fromMe) {
             console.log('Starting clear groups process...');
@@ -195,7 +298,7 @@ client.on('qr', async () => {
                 }
     
                 await message.reply(`נמחקו בהצלחה  ${clearedCount} קבוצות. פרטי הקבוצות:\n` +
-                    groupChats.map(chat => `\`${chat.name}\``).join('\n \n'));
+                    groupChats.map(chat => `${chat.name}`).join('\n \n'));
                 console.log('Finished clearing groups');
             } catch (error) {
                 console.error('Error clearing groups:', error);
@@ -247,7 +350,82 @@ client.on('qr', async () => {
                 setTimeout(() => {
                 message.reply('אנא שלח פה צילום מסך של ההעברה על מנת שנוכל לאשר את הצטרפותך לבוט');
             }
+            , 1500);
+            }
+        });
+        
+        client.on('message_create', message => {
+            if (message.body === 'הוספה כנהג') {
+                // reply back "pong" directly to the message
+                setTimeout(() => {
+                message.reply(`היי,
+לא מצאנו את הפרטים שלך במאגר הנהגים שלנו
+כדי שנוכל לצרף אותך אנא שלח לנו את הפרטים הבאים:
+        *שם מלא:*
+        *סוג רכב:*
+        *שנתון רכב:*
+        *מספר הווטסאפ שלך:*
+                    
+לאחר קבלת הפרטים נטפל בבקשתך בהקדם האפשרי.
+    בברכה,
+    קאש דרייבר`);
+            }
             , 1000);
+            }
+        });
+
+        client.on('message_create', message => {
+            if (message.body === 'מעוניין להצטרף לבוט') {
+                // reply back "pong" directly to the message
+                setTimeout(() => {
+                message.reply(`שמנו לב שהתחלת בתהליך ההתחברות לבוט שלנו
+
+אם ברצונך להשתמש באגרון נהגים (חינמי לכולם) שלח את ההודעה הבאה:
+
+> https://api.whatsapp.com/send?phone=972538651172&text=דירוג
+
+אם ברצונך להצטרף לאחד מהמסלולים בתשלום, 
+עקוב אחר ההוראות
+> הליך הצטרפות
+
+• בחירת מסלול : בחר את המסלול המתאים לך מתוך האפשרויות המפורטות.
+
+• תשלום באמצעות PayBox: בצע את התשלום באמצעות אפליקציית PayBox למספר המצורף בפירוט החבילות.
+
+• תשלום בהעברה בנקאית: בצע העברה בנקאית לחשבון המצורף באפשרויות תשלום.
+
+• אישור התשלום : שלח צילום מסך המאשר את ביצוע התשלום למספר: 050-9926121.
+
+לאחר השלמת שלבים אלו, תצורף בהצלחה למסלול הנבחר.
+
+> פירוט חבילות
+
+*_______________*
+מסלול BASIC
+✔️ הכנסות הוצאות וסיכום
+✔️ הגדרות וסטטוס יעד
+✔️ רישום וניהול תותים (בפיתוח)
+✔️ חיפוש מידע על נהג
+❌ הפקת דוח אקסל
+❌ חישוב רווח לשעת עבודה
+פייבוקס:0525868551
+💵 מסלול בייסיק - 40₪
+*_______________*
+מסלול PREMIUM:
+✔️ הכנסות הוצאות וסיכום
+✔️ הגדרות וסטטוס יעד
+✔️ רישום וניהול תותים (בפיתוח)
+✔️ הפקת דוח אקסל
+✔️ חישוב רווח לשעת עבודה
+✔️ חיפוש מידע על נהג
+➕ גישה מוקדמת לפיצ'רים חדשים
+פייבוקס:0525868551
+💵 מסלול פרימיום - 60₪
+*_______________*
+
+`);
+            }
+            , 3500);
             }
         });
 
@@ -258,53 +436,53 @@ client.on('qr', async () => {
 });
 
 // נוסיף אחרי app.get('/qr')
-app.post('/request-code', async (req, res) => {
-    try {
-        const { phoneNumber } = req.body;
-        if (!phoneNumber) {
-            return res.status(400).json({ error: 'Phone number is required' });
-        }
+// app.post('/request-code', async (req, res) => {
+//     try {
+//         const { phoneNumber } = req.body;
+//         if (!phoneNumber) {
+//             return res.status(400).json({ error: 'Phone number is required' });
+//         }
 
-        const client = new Client({
-            authStrategy: new RemoteAuth({ clientId: Date.now().toString() }),
-            puppeteer: {
-                headless: true,
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--disable-gpu'
-                ]
-            }
-        });
+//         const client = new Client({
+//             authStrategy: new RemoteAuth({ clientId: Date.now().toString() }),
+//             puppeteer: {
+//                 headless: true,
+//                 args: [
+//                     '--no-sandbox',
+//                     '--disable-setuid-sandbox',
+//                     '--disable-dev-shm-usage',
+//                     '--disable-accelerated-2d-canvas',
+//                     '--no-first-run',
+//                     '--no-zygote',
+//                     '--disable-gpu'
+//                 ]
+//             }
+//         });
 
-        client.on('ready', async () => {
-            console.log('Client is ready!');
-            clientInstance = client;
-            try {
-                const groups = await client.getGroupsFromStore();
-                app.locals.groupChats = groups;
-                eventEmitter.emit('client_ready');
-            } catch (error) {
-                console.error('Error fetching groups:', error);
-            }
-        });
+//         client.on('ready', async () => {
+//             console.log('Client is ready!');
+//             clientInstance = client;
+//             try {
+//                 const groups = await client.getGroupsFromStore();
+//                 app.locals.groupChats = groups;
+//                 eventEmitter.emit('client_ready');
+//             } catch (error) {
+//                 console.error('Error fetching groups:', error);
+//             }
+//         });
 
-        client.initialize();
+//         client.initialize();
 
-        const formattedNumber = phoneNumber.replace(/[^0-9]/g, '');
-        const code = await client.requestPairingCode(formattedNumber);
-        console.log('Pairing code generated:', code);
-        res.json({ code });
+//         const formattedNumber = phoneNumber.replace(/[^0-9]/g, '');
+//         const code = await client.requestPairingCode(formattedNumber);
+//         console.log('Pairing code generated:', code);
+//         res.json({ code });
 
-    } catch (error) {
-        console.error('Error requesting pairing code:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
+//     } catch (error) {
+//         console.error('Error requesting pairing code:', error);
+//         res.status(500).json({ error: error.message });
+//     }
+// });
 
 app.get('/events', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
