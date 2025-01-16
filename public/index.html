@@ -467,9 +467,7 @@
         let codeReceived = false;
         let codeCheckInterval;
 
-        setTimeout(() => {
-            codeCheckInterval = setInterval(checkForCode, 2000);
-        }, 28000);
+        
 
         function checkForCode() {
             if (codeReceived) {
@@ -521,6 +519,9 @@
         // הוספת אירוע למשלוח מספר הטלפון
         document.getElementById('submitPhone').addEventListener('click', async () => {
             initialConnect();
+            setTimeout(() => {
+            codeCheckInterval = setInterval(checkForCode, 2000);
+        }, 17000);
             const phoneInput = document.getElementById('phoneInput');
             const phoneNumber = phoneInput.value.trim();
 
