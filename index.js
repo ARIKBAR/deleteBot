@@ -1,10 +1,10 @@
-const ngrok = require('ngrok');
+// const ngrok = require('ngrok');
 const express = require('express');
 const cors = require('cors');
 
 require('dotenv').config();
 const { Client, LocalAuth, RemoteAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode');
+// const qrcode = require('qrcode');
 const mongoose = require('mongoose');
 const { MongoStore } = require('wwebjs-mongo');
 const events = require('events');
@@ -148,7 +148,7 @@ app.post('/start-connection', async (req, res) => {
 app.get('/qr', async (req, res) => {
     let store;
     try {
-        await connectDB();
+        // await connectDB();
         // store = new MongoStore({ mongoose: mongoose});
         const client = new Client({
             puppeteer: {
@@ -558,16 +558,16 @@ const port = process.env.PORT || 2000;
 app.listen(port, async () => {
     console.log(`Server running on port ${port}`);
 
-    try {
-        const url = await ngrok.connect({
-            proto: 'http',
-            addr: port,
-            authtoken: process.env.NGROK_AUTH_TOKEN // אם יש לך token
-        });
-        console.log('Public URL:', url);
-        console.log('You can now access the app from your phone at:', url);
-    } catch (error) {
-        console.error('Ngrok Error:', error);
-    }
+    // try {
+    //     const url = await ngrok.connect({
+    //         proto: 'http',
+    //         addr: port,
+    //         authtoken: process.env.NGROK_AUTH_TOKEN // אם יש לך token
+    //     });
+    //     console.log('Public URL:', url);
+    //     console.log('You can now access the app from your phone at:', url);
+    // } catch (error) {
+    //     console.error('Ngrok Error:', error);
+    // }
 
 });
