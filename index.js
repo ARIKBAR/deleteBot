@@ -154,8 +154,13 @@ app.get('/qr', async (req, res) => {
             puppeteer: {
                 args: [
                     '--no-sandbox',
+                    '--single-process',
+                    "--disable-gpu",
                     "--no-zygote",
                     "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-accelerated-2d-canvas",
+                    "--no-first-run",
                     '--disable-blink-features=AutomationControlled',
                     '--disable-features=IsolateOrigins,site-per-process',
                     '--disable-site-isolation-trials'
