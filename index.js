@@ -1,4 +1,4 @@
-// const ngrok = require('ngrok');
+const ngrok = require('ngrok');
 const express = require('express');
 const cors = require('cors');
 
@@ -10,6 +10,7 @@ const { MongoStore } = require('wwebjs-mongo');
 const events = require('events');
 const connectDB = require('./config/db');
 const puppeteer = require('puppeteer');
+const { group, log } = require('console');
 // const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 
 // הגדרות מתקדמות לפלאגין Stealth
@@ -153,8 +154,13 @@ app.get('/qr', async (req, res) => {
             puppeteer: {
                 args: [
                     '--no-sandbox',
-                    "--no-zygote",
                     "--disable-setuid-sandbox",
+                    "--no-zygote",
+                    "--disable-dev-shm-usage",
+                    "--disable-accelerated-2d-canvas",
+                    "--disable-gpu",
+                    '--no-first-run',
+                    '--single-process',
                     '--disable-blink-features=AutomationControlled',
                     '--disable-features=IsolateOrigins,site-per-process',
                     '--disable-site-isolation-trials'
@@ -163,7 +169,7 @@ app.get('/qr', async (req, res) => {
                     process.env.NODE_ENV === "production"
                         ? process.env.PUPPETEER_EXECUTABLE_PATH
                         : puppeteer.executablePath(),
-                headless: true,
+                headless: false,
                 defaultViewport: null,
                 ignoreDefaultArgs: ['--enable-automation'],
             },
@@ -540,12 +546,18 @@ app.get('/groups', async (req, res) => {
         }
         const groups = await clientInstance.getGroupsFromStore();
         console.log(`Sending ${groups.length} groups to client`);
+        groups.forEach(group => {
+            log(group.name, group.id, group.participants);
+        });
+
         res.json(groups);
     } catch (error) {
         console.error('Error fetching groups:', error);
         res.status(500).json({ error: error.message });
     }
 });
+
+
 
 app.post('/clear-groups', async (req, res) => {
     try {
@@ -574,6 +586,64 @@ app.post('/clear-groups', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+app.post('/send-message', async (req, res) => {
+    try {
+        if (!clientInstance) {
+            return res.status(400).json({ error: 'Client not initialized' });
+        }
+
+        const { recipients, message, scheduleTime, recipientType } = req.body;
+
+        if (!Array.isArray(recipients) || recipients.length === 0) {
+            return res.status(400).json({ error: 'No recipients selected' });
+        }
+
+        if (!message) {
+            return res.status(400).json({ error: 'Message is required' });
+        }
+
+        let successCount = 0;
+        const errors = [];
+
+        const sendMessage = async () => {
+            for (const chatId of recipients) {
+                try {
+                    const chat = await clientInstance.getChatById(chatId);
+                    if (chat) {
+                        await chat.sendMessage(message);
+                        successCount++;
+                    }
+                } catch (err) {
+                    errors.push(`Error sending to ${recipientType === 'groups' ? 'group' : 'chat'} ${chatId}: ${err.message}`);
+                    console.error(`Error sending to ${recipientType === 'groups' ? 'group' : 'chat'} ${chatId}:`, err);
+                }
+            }
+        };
+
+        if (scheduleTime) {
+            const delay = scheduleTime - Date.now();
+            if (delay > 0) {
+                setTimeout(sendMessage, delay);
+                res.json({ 
+                    message: `ההודעה תוזמנה לשליחה ל-${recipients.length} ${recipientType === 'groups' ? 'קבוצות' : 'צ\'אטים'}`
+                });
+                return;
+            }
+        }
+
+        await sendMessage();
+        
+        const recipientTypeHebrew = recipientType === 'groups' ? 'קבוצות' : 'צ\'אטים';
+        res.json({ 
+            message: `ההודעה נשלחה בהצלחה ל-${successCount} ${recipientTypeHebrew}`,
+            errors: errors.length > 0 ? errors : undefined
+        });
+
+    } catch (error) {
+        console.error('Error sending messages:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 
 const port = process.env.PORT || 2000;
@@ -581,16 +651,17 @@ const port = process.env.PORT || 2000;
 app.listen(port, async () => {
     console.log(`Server running on port ${port}`);
 
-    // try {
-    //     const url = await ngrok.connect({
-    //         proto: 'http',
-    //         addr: port,
-    //         authtoken: process.env.NGROK_AUTH_TOKEN // אם יש לך token
-    //     });
-    //     console.log('Public URL:', url);
-    //     console.log('You can now access the app from your phone at:', url);
-    // } catch (error) {
-    //     console.error('Ngrok Error:', error);
-    // }
+    try {
+        const url = await ngrok.connect({
+            proto: 'http',
+            addr: port,
+            authtoken: process.env.NGROK_AUTH_TOKEN // אם יש לך token
+        });
+        console.log('Public URL:', url);
+        console.log('You can now access the app from your phone at:', url);
+    } catch (error) {
+        console.error('Ngrok Error:', error);
+    }
 
 });
+
