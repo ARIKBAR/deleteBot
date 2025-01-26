@@ -259,6 +259,7 @@
             padding: 12px;
             border-bottom: 1px solid #eee;
             transition: var(--transition);
+            gap:5px;
         }
 
         #groupList li:last-child {
@@ -385,6 +386,23 @@
 
             <!-- טאב קבוצות -->
             <div id="groups-tab" class="tab-content">
+                <button id="refresh" class="button" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                        <path d="M21 3v5h-5"/>
+                        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                        <path d="M8 16H3v5"/>
+                    </svg>
+                    רענן רשימת קבוצות
+                </button>
+                <div style="margin: 10px 0;">
+                    <input type="text" 
+                           id="groupSearch" 
+                           class="datetime-input" 
+                           placeholder="חפש לפי שם קבוצה..."
+                           style="width: 100%;">
+                </div>
+
                 <button id="selectAllGroups" class="button">בחר הכל</button>
                 <ul id="groupList"></ul>
                 <button id="clearSelectedGroups" class="button">מחק הודעות בקבוצות נבחרות</button>
@@ -392,7 +410,49 @@
 
             <!-- טאב הודעות -->
             <div id="message-tab" class="tab-content">
-                <textarea id="messageText" class="textarea" placeholder="הכנס את תוכן ההודעה כאן..."></textarea>
+                <!-- <textarea id="messageText" class="textarea" placeholder="הכנס את תוכן ההודעה כאן..."></textarea> -->
+                <div class="message-editor">
+                    <div class="editor-toolbar">
+                        <button class="format-btn" data-format="*" title="מודגש">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
+                                <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
+                            </svg>
+                        </button>
+                        <button class="format-btn" data-format="_" title="נטוי">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="19" y1="4" x2="10" y2="4"></line>
+                                <line x1="14" y1="20" x2="5" y2="20"></line>
+                                <line x1="15" y1="4" x2="9" y2="20"></line>
+                            </svg>
+                        </button>
+                        <button class="format-btn" data-format="~" title="קו חוצה">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                <path d="M16 6C16 6 14.5 4 12 4C9.5 4 7 6 7 8"></path>
+                                <path d="M8 18C8 18 9.5 20 12 20C14.5 20 17 18 17 16"></path>
+                            </svg>
+                        </button>
+                        <button class="format-btn" data-format="\`\`\`" title="קוד">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="16 18 22 12 16 6"></polyline>
+                                <polyline points="8 6 2 12 8 18"></polyline>
+                            </svg>
+                        </button>
+                        <button class="format-btn" data-format=">" title="ציטוט">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="editor-container">
+                        <textarea id="messageText" class="textarea" placeholder="הכנס את תוכן ההודעה כאן..."></textarea>
+                        <div id="preview" class="preview"></div>
+                    </div>
+                    <div class="editor-footer">
+                        <button class="toggle-preview" onclick="togglePreview()">תצוגה מקדימה</button>
+                    </div>
+                </div>
 
                 <div>
                     <label>תזמון שליחה (אופציונלי):</label>
@@ -404,6 +464,119 @@
                 </button>
             </div>
         </div>
+        <style>
+            .message-editor {
+                background: white;
+                border: 1px solid #ddd;
+                border-radius: var(--border-radius);
+                overflow: hidden;
+            }
+            
+            .editor-toolbar {
+                display: flex;
+                gap: 8px;
+                padding: 8px;
+                background: #f8f9fa;
+                border-bottom: 1px solid #ddd;
+            }
+            
+            .format-btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 36px;
+                height: 36px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                background: white;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            
+            .format-btn:hover {
+                background: #f0f0f0;
+            }
+            
+            .format-btn svg {
+                width: 18px;
+                height: 18px;
+                stroke: #666;
+            }
+            
+            .editor-container {
+                position: relative;
+            }
+            
+            .textarea {
+                width: 100%;
+                min-height: 150px;
+                padding: 16px;
+                border: none;
+                resize: vertical;
+                font-family: inherit;
+                line-height: 1.5;
+            }
+            
+            .preview {
+                display: none;
+                padding: 16px;
+                min-height: 150px;
+                white-space: pre-wrap;
+                line-height: 1.5;
+            }
+            
+            .preview.active {
+                display: block;
+            }
+            
+            .preview b {
+                font-weight: bold;
+            }
+            
+            .preview i {
+                font-style: italic;
+            }
+            
+            .preview s {
+                text-decoration: line-through;
+            }
+            
+            .preview blockquote {
+                border-right: 3px solid var(--primary-color);
+                margin: 0;
+                padding: 4px 12px;
+                background: #f8f9fa;
+            }
+            
+            .preview code {
+                background: #2d2d2d;
+                color: #fff;
+                padding: 2px 4px;
+                border-radius: 4px;
+                font-family: monospace;
+            }
+            
+            .editor-footer {
+                padding: 8px;
+                background: #f8f9fa;
+                border-top: 1px solid #ddd;
+                display: flex;
+                justify-content: flex-end;
+            }
+            
+            .toggle-preview {
+                padding: 6px 12px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                background: white;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            
+            .toggle-preview:hover {
+                background: #f0f0f0;
+            }
+            </style>
 
         <!-- תפריט ניווט -->
         <nav class="bottom-nav">
@@ -478,43 +651,67 @@
             fetch('/code')
                 .then(response => response.json())
                 .then(data => {
-                    if (data.code) {
-                        codeReceived = true;
-                        clearInterval(codeCheckInterval);
+                    if (data.authenticated) {
+                clearInterval(codeCheckInterval);
+                // מעבר ישיר למצב מחובר
+                handleAuthenticated();
+                return;
+            }
+            
+            // אם יש קוד חדש
+            if (data.code) {
+                handleReceivedCode(data.code);
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            if (codeReceived) {
+                clearInterval(codeCheckInterval);
+            }
+        });
+}
+function handleAuthenticated() {
+    document.getElementById('qrcode').style.display = 'none';
+    document.getElementById('status').style.display = 'none';
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('instructions').style.display = 'none';
+    fetchGroups();
+}
+function handleReceivedCode(code) {
+            codeReceived = true;
+            clearInterval(codeCheckInterval);
 
-                        const codeStr = String(data.code);
+            const codeStr = String(code);
+            const codeHtml = generateCodeHtml(codeStr);
+            displayCode(codeHtml);
+            setupCopyButton(codeStr);
+        }
 
-                        // יצירת HTML לתצוגת הקוד
-                        const codeHtml = codeStr.split('').map((digit, index) => `
-                    <div class="code-digit">
-                        ${digit}
-                    </div>${index === 3 ? '<div class="code-separator">-</div>' : ''}`
-                        ).join('');
+        function generateCodeHtml(codeStr) {
+            return codeStr.split('').map((digit, index) => `
+                <div class="code-digit">
+                    ${digit}
+                </div>${index === 3 ? '<div class="code-separator">-</div>' : ''}`
+            ).join('');
+        }
 
-                        // הצגת הקוד על המסך
-                        document.getElementById('qrcode').innerHTML = `
-                    <div class="code-container">
-                        <div class="code-display">
-                            ${codeHtml}
-                        </div>
-                        <button id="copyCodeBtn" class="copy-button">העתק קוד</button>
-                    </div>`;
+        function displayCode(codeHtml) {
+            document.getElementById('qrcode').innerHTML = `
+                <div class="code-container">
+                    <div class="code-display">
+                        ${codeHtml}
+                    </div>
+                    <button id="copyCodeBtn" class="copy-button">העתק קוד</button>
+                </div>`;
+            document.getElementById('status').innerText = 'השתמש בקוד זה להתחברות';
+        }
 
-                        document.getElementById('status').innerText = 'השתמש בקוד זה להתחברות';
-
-                        document.getElementById('copyCodeBtn').addEventListener('click', () => {
-                            navigator.clipboard.writeText(codeStr)
-                                .then()
-                                .catch(err => console.error('Error copying code:', err));
-                        });
-                    }
-                })
-                .catch(err => {
-                    console.error('Error:', err);
-                    if (codeReceived) {
-                        clearInterval(codeCheckInterval);
-                    }
-                });
+        function setupCopyButton(codeStr) {
+            document.getElementById('copyCodeBtn').addEventListener('click', () => {
+                navigator.clipboard.writeText(codeStr)
+                    .then()
+                    .catch(err => console.error('Error copying code:', err));
+            });
         }
         // הוספת אירוע למשלוח מספר הטלפון
         document.getElementById('submitPhone').addEventListener('click', async () => {
@@ -562,6 +759,8 @@
             .then(response => {
                 if (!response.ok) throw new Error('Network response was not ok');
                 return response.json();
+                console.log(response.json());
+                
             })
             .then(data => {
                 if (data.error) throw new Error(data.error);
@@ -660,8 +859,6 @@
                 document.getElementById('instructions').style.display = 'none';
             }
         };
-
-        // בחירת כל הקבוצות
         let allSelected = false;
         document.getElementById('selectAllGroups').addEventListener('click', () => {
             const checkboxes = document.querySelectorAll('.groupCheckbox');
@@ -669,6 +866,11 @@
             checkboxes.forEach(checkbox => checkbox.checked = allSelected);
             document.getElementById('selectAllGroups').innerText =
                 allSelected ? 'בטל בחירה' : 'בחר הכל';
+        });
+        // בחירת כל הקבוצות
+        document.getElementById('refresh').addEventListener('click', () => {
+            fetchGroups()
+
         });
 
         // מחיקת קבוצות
@@ -759,6 +961,104 @@
                 alert('אירעה שגיאה בשליחת ההודעה: ' + err.message);
             }
         });
+        function wrapSelectedText(textarea, wrapper) {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.substring(start, end);
+    const beforeText = textarea.value.substring(0, start);
+    const afterText = textarea.value.substring(end);
+
+    // טיפול מיוחד בציטוט
+    if (wrapper === '>') {
+        const lines = selectedText.split('\n');
+        const quotedText = lines.map(line => `${wrapper} ${line}`).join('\n');
+        textarea.value = beforeText + quotedText + afterText;
+        textarea.setSelectionRange(start + 2, start + quotedText.length);
+    } 
+    // טיפול מיוחד בקוד
+    else if (wrapper === '```') {
+        textarea.value = beforeText + wrapper + '\n' + selectedText + '\n' + wrapper + afterText;
+        textarea.setSelectionRange(start + 4, start + 4 + selectedText.length);
+    }
+    // כל שאר הפורמטים
+    else {
+        textarea.value = beforeText + wrapper + selectedText + wrapper + afterText;
+        textarea.setSelectionRange(start + wrapper.length, end + wrapper.length);
+    }
+
+    updatePreview();
+}
+
+// מאזין לכפתורי העיצוב
+document.querySelectorAll('.format-btn').forEach(button => {
+    button.addEventListener('click', () => {
+        const textarea = document.getElementById('messageText');
+        const format = button.dataset.format;
+        wrapSelectedText(textarea, format);
+        textarea.focus();
+    });
+});
+
+// פונקציית תצוגה מקדימה
+function updatePreview() {
+    const text = document.getElementById('messageText').value;
+    const preview = document.getElementById('preview');
+    
+    // המרת פורמט וואטסאפ ל-HTML
+    let html = text
+        // קוד
+        .replace(/```([\s\S]*?)```/g, '<code>$1</code>')
+        // מודגש
+        .replace(/\*(.*?)\*/g, '<b>$1</b>')
+        // נטוי
+        .replace(/_(.*?)_/g, '<i>$1</i>')
+        // קו חוצה
+        .replace(/~(.*?)~/g, '<s>$1</s>')
+        // ציטוט
+        .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
+        // שמירה על שורות חדשות
+        .replace(/\n/g, '<br>');
+
+    preview.innerHTML = html;
+}
+
+// מאזין לשינויים בטקסט
+document.getElementById('messageText').addEventListener('input', updatePreview);
+
+// החלפה בין עריכה לתצוגה מקדימה
+let isPreviewMode = false;
+
+function togglePreview() {
+    const textarea = document.getElementById('messageText');
+    const preview = document.getElementById('preview');
+    const toggleButton = document.querySelector('.toggle-preview');
+    
+    isPreviewMode = !isPreviewMode;
+    
+    if (isPreviewMode) {
+        updatePreview();
+        textarea.style.display = 'none';
+        preview.classList.add('active');
+        toggleButton.textContent = 'חזרה לעריכה';
+    } else {
+        textarea.style.display = 'block';
+        preview.classList.remove('active');
+        toggleButton.textContent = 'תצוגה מקדימה';
+    }
+}
+document.getElementById('groupSearch').addEventListener('input', function(e) {
+    const searchTerm = e.target.value.toLowerCase();
+    const groupElements = document.querySelectorAll('#groupList li');
+    
+    groupElements.forEach(li => {
+        const groupName = li.textContent.toLowerCase();
+        if (groupName.includes(searchTerm)) {
+            li.style.display = '';
+        } else {
+            li.style.display = 'none';
+        }
+    });
+});
     </script>
 </body>
 
