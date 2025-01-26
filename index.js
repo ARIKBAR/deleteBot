@@ -154,13 +154,8 @@ app.get('/qr', async (req, res) => {
             puppeteer: {
                 args: [
                     '--no-sandbox',
-                    "--disable-setuid-sandbox",
                     "--no-zygote",
-                    "--disable-dev-shm-usage",
-                    "--disable-accelerated-2d-canvas",
-                    "--disable-gpu",
-                    '--no-first-run',
-                    '--single-process',
+                    "--disable-setuid-sandbox",
                     '--disable-blink-features=AutomationControlled',
                     '--disable-features=IsolateOrigins,site-per-process',
                     '--disable-site-isolation-trials'
@@ -169,7 +164,7 @@ app.get('/qr', async (req, res) => {
                     process.env.NODE_ENV === "production"
                         ? process.env.PUPPETEER_EXECUTABLE_PATH
                         : puppeteer.executablePath(),
-                headless: false,
+                headless: true,
                 defaultViewport: null,
                 ignoreDefaultArgs: ['--enable-automation'],
             },
@@ -178,111 +173,17 @@ app.get('/qr', async (req, res) => {
                 // store: store,
                 // backupSyncIntervalMs: 300000
             }),
-            pairWithPhoneNumber: {
-                // phoneNumber: "972509926121",
-                showNotification: true,
-            }
+            // pairWithPhoneNumber: {
+            //     phoneNumber: "972509926121",
+            //     showNotification: true,
+            // }
         });
         let extractedCode = null;
+        let hasRequestedCode = false;
 
-        async function startAutomation() {
-            try {
-                if (hasStartedAutomation) {
-                    console.log('Automation already started, skipping...');
-                    return;
-                }
-        
-                hasStartedAutomation = true;
-                console.log('Starting automation process...');
-        
-                // שלב 1: קבלת העמוד
-                const page = await client.pupPage;
-                if (!page) {
-                    throw new Error('Page not available');
-                }
-                console.log('Page obtained successfully');
-        
-                // שלב 2: הגדרת התנהגויות דפדפן
-                await page.evaluateOnNewDocument(() => {
-                    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-                    window.navigator.chrome = { runtime: {} };
-                    Object.defineProperty(navigator, 'languages', { get: () => ['he-IL', 'he'] });
-                    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
-                });
-                console.log('Browser behaviors set');
-        
-                // שלב 3: הגדרת User Agent
-                await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-                console.log('User agent set');
-        
-                // שלב 4: חיפוש והקלקה על כפתור הטלפון
-                console.log('Looking for phone button...');
-                await page.waitForSelector('[data-icon="chevron"]', { 
-                    timeout: 60000,
-                });
-                console.log('Phone button found');
-                
-                await randomDelay(1000, 2000);
-                await page.click('[data-icon="chevron"]');
-                console.log('Phone button clicked successfully');
-        
-                // שלב 5: חיפוש והזנת מספר טלפון
-                console.log('Looking for phone input...');
-                const phoneInputSelector = '.selectable-text.x1n2onr6.xy9n6vp.x1n327nk.xh8yej3.x972fbf.xcfux6l.x1qhh985.xm0m39n.xjbqb8w.x1uvtmcs.x1jchvi3.xss6m8b.xexx8yu.x4uap5.x18d9i69.xkhd6sd';
-                await page.waitForSelector(phoneInputSelector, { 
-                    timeout: 60000,
-                });
-                console.log('Phone input found');
-        
-                await randomDelay(1000, 2000);
-                await page.type(phoneInputSelector, currentPhoneNumber, { delay: 100 });
-                console.log('Phone number entered successfully');
-        
-                // שלב 6: חיפוש והקלקה על כפתור הבא
-                console.log('Looking for next button...');
-                const nextButtonSelector = '.x889kno.x1a8lsjc.xbbxn1n.xxbr6pl.x1n2onr6.x1rg5ohu.xk50ysn.x1f6kntn.xyesn5m.x1z11no5.xjy5m1g.x1mnwbp6.x4pb5v6.x178xt8z.xm81vs4.xso031l.xy80clv.x13fuv20.xu3j5b3.x1q0q8m5.x26u7qi.x1v8p93f.xogb00i.x16stqrj.x1ftr3km.x1hl8ikr.xfagghw.x9dyr19.x9lcvmn.xbtce8p.x14v0smp.xo8ufso.xcjl5na.x1k3x3db.xuxw1ft.xv52azi';
-                await page.waitForSelector(nextButtonSelector, { 
-                    timeout: 60000,
-                });
-                console.log('Next button found');
-        
-                await randomDelay(1000, 2000);
-                await page.click(nextButtonSelector);
-                console.log('Next button clicked successfully');
-        
-                // שלב 7: המתנה לקוד
-                console.log('Waiting for code to appear...');
-                await page.waitForSelector('div[data-link-code]', { 
-                    timeout: 60000,
-                });
-                console.log('Code element found');
-        
-                // שלב 8: חילוץ הקוד
-                console.log('Extracting code...');
-                const code = await page.evaluate(() => {
-                    const codeElement = document.querySelector('div[data-link-code]');
-                    if (codeElement) {
-                        const codeAttr = codeElement.getAttribute('data-link-code');
-                        return codeAttr.split(',').join('');
-                    }
-                    return null;
-                });
-        
-                if (code) {
-                    console.log('Code extracted successfully:', code);
-                    extractedCode = code;
-                    return code;
-                } else {
-                    throw new Error('Could not extract pairing code');
-                }
-        
-            } catch (error) {
-                console.error('Error in automation process:', error);
-                console.error('Error stack:', error.stack);
-                hasStartedAutomation = false;
-                throw error;
-            }
-        }
+
+       
+
         app.get('/code', (req, res) => {
             if (extractedCode) {
                 res.json({ code: extractedCode });
@@ -294,10 +195,17 @@ app.get('/qr', async (req, res) => {
 
         client.on('qr', async () => {
             console.log('QR Code received, starting automation...');
-            if (!hasStartedAutomation) {
-                setTimeout(async () => {
-                    await startAutomation().catch(console.error);
-                }, 800);
+            if (!hasRequestedCode && currentPhoneNumber) {
+                try {
+                    hasRequestedCode = true;
+                    const formattedNumber = currentPhoneNumber;
+                    const code = await client.requestPairingCode(formattedNumber, true);
+                    console.log('התקבל קוד צימוד:', code);
+                    extractedCode = code;
+                } catch (error) {
+                    console.error('שגיאה בבקשת קוד צימוד:', error);
+                    hasRequestedCode = false;
+                }
             }
         });
 
@@ -461,6 +369,7 @@ app.get('/qr', async (req, res) => {
                     , 3500);
             }
         });
+        res.json({ success: true });
 
     } catch (error) {
         console.error('Server error:', error);
@@ -651,17 +560,16 @@ const port = process.env.PORT || 2000;
 app.listen(port, async () => {
     console.log(`Server running on port ${port}`);
 
-    try {
-        const url = await ngrok.connect({
-            proto: 'http',
-            addr: port,
-            authtoken: process.env.NGROK_AUTH_TOKEN // אם יש לך token
-        });
-        console.log('Public URL:', url);
-        console.log('You can now access the app from your phone at:', url);
-    } catch (error) {
-        console.error('Ngrok Error:', error);
-    }
+    // try {
+    //     const url = await ngrok.connect({
+    //         proto: 'http',
+    //         addr: port,
+    //         authtoken: process.env.NGROK_AUTH_TOKEN // אם יש לך token
+    //     });
+    //     console.log('Public URL:', url);
+    //     console.log('You can now access the app from your phone at:', url);
+    // } catch (error) {
+    //     console.error('Ngrok Error:', error);
+    // }
 
 });
-

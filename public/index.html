@@ -764,9 +764,9 @@ function handleReceivedCode(code) {
             })
             .then(data => {
                 if (data.error) throw new Error(data.error);
-                document.getElementById('qrcode').innerHTML =
-                    `<img src="${data.qrCode}" alt="QR Code">`;
-                document.getElementById('status').innerText = 'ממתין לסריקה...';
+                // document.getElementById('qrcode').innerHTML =
+                    // `<img src="${data.qrCode}" alt="QR Code">`;
+                document.getElementById('status').innerText = 'ממתין לקוד התחברות...';
             })
             } catch (err) {
                 console.error('Error:', err);
