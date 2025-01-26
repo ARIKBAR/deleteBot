@@ -153,14 +153,17 @@ app.get('/qr', async (req, res) => {
         const client = new Client({
             puppeteer: {
                 args: [
-                    "--no-sandbox",
+                    '--no-sandbox',
+                    '--single-process',
+                    "--disable-gpu",
+                    "--no-zygote",
                     "--disable-setuid-sandbox",
                     "--disable-dev-shm-usage",
                     "--disable-accelerated-2d-canvas",
                     "--no-first-run",
-                    "--no-zygote",
-                    '--single-process',
-                    "--disable-gpu"
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-features=IsolateOrigins,site-per-process',
+                    '--disable-site-isolation-trials'
                 ],
                 executablePath:
                     process.env.NODE_ENV === "production"
