@@ -116,8 +116,6 @@
         let codeReceived = false;
         let codeCheckInterval;
 
-
-
         function checkForCode() {
             if (codeReceived) {
                 clearInterval(codeCheckInterval);
@@ -163,6 +161,7 @@
                     }
                 });
         }
+
         document.getElementById('submitPhone').addEventListener('click', async () => {
             initialConnect();
             setTimeout(() => {
@@ -202,7 +201,7 @@
             try {
                 const response = await fetch('/qr', {
                     method: 'GET',
-                    credentials: 'include'
+                    credentials: 'include' // Important
                 });
 
                 if (!response.ok) {
@@ -271,19 +270,31 @@
         }
 
         eventSource.onmessage = function (event) {
+            console.log("Event received:", event.data);
+
             if (event.data === 'client_ready') {
-                document.getElementById('qrcode').style.display = 'none';
-                document.getElementById('status').style.display = 'none';
-                document.getElementById('instructions').style.display = 'none';
+                let qrElement = document.getElementById('qrcode');
+                let statusElement = document.getElementById('status');
+                let instructionsElement = document.getElementById('instructions');
+
+                if (qrElement) qrElement.style.display = 'none';
+                if (statusElement) statusElement.style.display = 'none';
+                if (instructionsElement) instructionsElement.style.display = 'none';
+
                 fetchGroups();
             }
+
             if (event.data === 'authenticated') {
-                document.getElementById('qrcode').style.display = 'none';
-                document.getElementById('status').style.display = 'none';
-                document.getElementById('loading').style.display = 'block';
-                document.getElementById('instructions').style.display = 'none';
+                let qrElement = document.getElementById('qrcode');
+                let statusElement = document.getElementById('status');
+                let loadingElement = document.getElementById('loading');
+
+                if (qrElement) qrElement.style.display = 'none';
+                if (statusElement) statusElement.style.display = 'none';
+                if (loadingElement) loadingElement.style.display = 'block';
             }
         };
+
 
         let allSelected = false;
         document.getElementById('selectAllGroups').addEventListener('click', () => {
@@ -296,19 +307,18 @@
 
         document.getElementById('clearSelectedGroups').addEventListener('click', async () => {
             const selectedGroups = Array.from(document.querySelectorAll('.groupCheckbox:checked'))
-                .map(cb => cb.value)
-                .filter(Boolean);
+                .map(cb => cb.dataset.groupId || cb.value);
 
-            if (selectedGroups.length === 0) {
-                alert('לא נבחרו קבוצות למחיקה');
+            console.log("Selected Groups for Clearing:", selectedGroups);
+
+            if (selectedGroups.length === 0 || selectedGroups.includes('undefined')) {
+                alert('לא נמצאו קבוצות למחיקה. נסה לרענן את הדף ולבחור שוב.');
                 return;
             }
 
             if (!confirm('האם אתה בטוח שברצונך למחוק את הקבוצות שנבחרו?')) {
                 return;
             }
-
-            console.log("Sending groups for deletion:", selectedGroups);
 
             try {
                 const response = await fetch('/clear-groups', {
@@ -320,16 +330,15 @@
                 if (!response.ok) throw new Error('Network response was not ok');
 
                 const result = await response.json();
+                console.log("Clear Groups API Response:", result);
                 alert(result.message);
-                window.cachedGroups = null;
+                cachedGroups = null;
                 fetchGroups();
             } catch (err) {
-                console.error('Error:', err);
+                console.error('Error clearing groups:', err);
                 alert('אירעה שגיאה: ' + err.message);
             }
         });
-
-
 
         document.getElementById('sendMessage').addEventListener('click', async () => {
             const selectedGroups = Array.from(document.querySelectorAll('.groupCheckbox:checked'))
@@ -386,7 +395,6 @@
             }
         });
 
-
         async function checkExistingSession() {
             try {
                 const response = await fetch('/check-session');
@@ -396,7 +404,6 @@
                     document.getElementById('phone-form').style.display = 'none';
                     document.getElementById('connection-process').style.display = 'block';
                     document.getElementById('status').innerText = 'מתחבר לחשבון קיים...';
-
                     setTimeout(() => {
                         codeCheckInterval = setInterval(checkForCode, 2000);
                     }, 2000);
@@ -405,6 +412,7 @@
                 console.error('Error checking session:', error);
             }
         }
+
         document.addEventListener('DOMContentLoaded', checkExistingSession);
 
         document.getElementById('logoutBtn').addEventListener('click', async () => {
@@ -435,50 +443,48 @@
             event.currentTarget.classList.add('active');
         }
 
-
         function displayGroups(groups) {
             console.time('displayGroups');
             const groupList = document.getElementById('groupList');
-
             if (!groupList) {
-                console.error('groupList element not found');
+                console.error('groupList element not found.');
                 return;
             }
 
             groupList.innerHTML = '';
 
-            groups.forEach(group => {
-                if (!group.id || !group.name) {
-                    console.error("Skipping invalid group:", group);
-                    return;
-                }
+            const fragment = document.createDocumentFragment();
+            const template = document.createElement('template');
 
-                const listItem = document.createElement('li');
-                listItem.innerHTML = `
-            <input type="checkbox" class="groupCheckbox" value="${group.id}"> 
+            const html = groups.map(group =>
+                `<li>
+            <input type="checkbox" class="groupCheckbox" value="${group.id._serialized}" data-group-id="${group.id._serialized}">
             ${group.name}
-        `;
+        </li>`
+            ).join('');
 
-                groupList.appendChild(listItem);
-            });
+            template.innerHTML = html;
+            fragment.appendChild(template.content);
+            groupList.appendChild(fragment);
 
+            document.getElementById('groups').style.display = 'block';
+            document.getElementById('status').innerText = `נטענו ${groups.length} קבוצות בהצלחה`;
             console.timeEnd('displayGroups');
         }
 
 
-        let isFetchingGroups = false;
-
         async function fetchGroups() {
-            if (isFetchingGroups) {
-                console.warn('fetchGroups already running, skipping duplicate call.');
+            console.time('fetchGroups');
+            const loading = document.getElementById('loading');
+            const status = document.getElementById('status');
+
+            if (!loading || !status) {
+                console.error('Required DOM elements not found');
                 return;
             }
 
-            console.time('fetchGroups');
-            isFetchingGroups = true;
-
             try {
-                document.getElementById('loading').style.display = 'block';
+                loading.style.display = 'block';
 
                 if (window.cachedGroups) {
                     console.log('Using cached groups');
@@ -495,13 +501,13 @@
                 console.timeEnd('fetchGroups');
                 displayGroups(groups);
             } catch (err) {
-                console.error('Error fetching groups:', err);
-                document.getElementById('status').innerText = 'Error fetching groups: ' + err.message;
+                console.error('Error:', err);
+                if (status) status.innerText = 'אירעה שגיאה: ' + err.message;
             } finally {
-                document.getElementById('loading').style.display = 'none';
-                isFetchingGroups = false;
+                if (loading) loading.style.display = 'none';
             }
         }
+
 
         async function checkConnectionStatus() {
             try {
