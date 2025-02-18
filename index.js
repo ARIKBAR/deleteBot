@@ -21,9 +21,7 @@ app.use(cors());
 
 app.use(express.json());
 app.use(express.static('public'));
-
 app.use(cookieParser());
-
 app.use('/api/auth', authRoutes);
 
 console.log('Starting script...');
@@ -215,22 +213,18 @@ app.get('/connection-status', auth, async (req, res) => {
 app.post('/start-connection', auth, async (req, res) => {
     try {
         const { phoneNumber } = req.body;
-        
         const numberToUse = phoneNumber || req.user.whatsappNumber;
         
         if (!numberToUse) {
             return res.status(400).json({ error: 'Phone number is required' });
         }
-
         if (phoneNumber) {
             req.user.whatsappNumber = phoneNumber;
             await req.user.save();
         }
-        
         currentPhoneNumber = numberToUse;
-
         const client = createWhatsAppClient(req.user._id.toString(), numberToUse);
-        
+
         client.on('ready', () => {
             console.log('Client is ready!');
             clientInstance = client;
@@ -535,6 +529,7 @@ app.get('/qr', auth, async (req, res) => {
 
     client.on('message_create', message => {
         if (message.body === 'מעוניין להצטרף לבוט') {
+            // reply back "pong" directly to the message
             setTimeout(() => {
                 message.reply(`שמנו לב שהתחלת בתהליך ההתחברות לבוט שלנו
 
@@ -564,8 +559,8 @@ app.get('/qr', auth, async (req, res) => {
 ✔️ הגדרות וסטטוס יעד
 ✔️ רישום וניהול תותים (בפיתוח)
 ✔️ חיפוש מידע על נהג
-❌ הפקת דוח אקסל
-❌ חישוב רווח לשעת עבודה
+הפקת דוח אקסל
+חישוב רווח לשעת עבודה
 פייבוקס:0525868551
 💵 מסלול בייסיק - 40₪
 *_______________*
@@ -612,20 +607,12 @@ app.get('/events', (req, res) => {
 });
 
 app.get('/groups', async (req, res) => {
-    try {ש
+    try {
         if (!clientInstance) {
             return res.status(400).json({ error: 'Client not initialized' });
         }
-
-        const chats = await clientInstance.getChats();
-        console.log(`Fetched ${chats.length} chats`);
-
-        const groups = chats.filter(chat => chat.isGroup).map(group => ({
-            id: group.id._serialized,
-            name: group.name
-        }));
-
-        console.log("Sending groups:", groups);
+        const groups = await clientInstance.getGroupsFromStore();
+        console.log(`Sending ${groups.length} groups to client`);
         res.json(groups);
     } catch (error) {
         console.error('Error fetching groups:', error);
@@ -635,46 +622,48 @@ app.get('/groups', async (req, res) => {
 
 app.post('/clear-groups', async (req, res) => {
     try {
-        if (!clientInstance) {
+        if (!clientInstance || !clientInstance.info) {
+            console.error('Client instance is not initialized or not ready');
             return res.status(400).json({ error: 'Client not initialized' });
         }
 
         const { groupIds } = req.body;
-        if (!Array.isArray(groupIds) || groupIds.length === 0) {
-            return res.status(400).json({ error: 'No groups selected' });
+
+        console.log("Received Group IDs for Clearing:", groupIds);
+
+        if (!Array.isArray(groupIds) || groupIds.length === 0 || groupIds.includes('undefined')) {
+            return res.status(400).json({ error: 'No valid groups selected' });
         }
 
-        console.log("Received group IDs:", groupIds);
-
-        const clearPromises = groupIds.map(async (groupId) => {
-            if (!groupId || !groupId.endsWith('@g.us')) {
-                console.warn(`Invalid groupId skipped: ${groupId}`);
-                return;
+        let clearedCount = 0;
+        for (let groupId of groupIds) {
+            if (!groupId.endsWith('@g.us')) {
+                console.warn(`Skipping invalid group ID: ${groupId}`);
+                continue; 
             }
 
             try {
                 const chat = await clientInstance.getChatById(groupId);
                 if (!chat) {
-                    console.warn(`Chat not found for group ID: ${groupId}`);
-                    return;
+                    console.warn(`Chat not found for ID: ${groupId}`);
+                    continue;
                 }
 
+                console.log(`Clearing messages for group: ${chat.name} (${groupId})`);
                 await chat.clearMessages();
-                console.log(`Cleared messages for group: ${groupId}`);
+                clearedCount++;
             } catch (err) {
                 console.error(`Error clearing group ${groupId}:`, err);
             }
-        });
+        }
 
-        await Promise.all(clearPromises);
-        res.json({ message: `נמחקו ${groupIds.length} קבוצות בהצלחה` });
-
+        console.log(`Successfully cleared ${clearedCount} groups`);
+        res.json({ message: `Successfully cleared ${clearedCount} groups` });
     } catch (error) {
-        console.error('Error clearing groups:', error);
+        console.error('Error in /clear-groups:', error);
         res.status(500).json({ error: error.message });
     }
 });
-
 
 app.post('/restore-session', auth, async (req, res) => {
     try {
@@ -704,7 +693,6 @@ const port = process.env.PORT || 2000;
 const startServer = async () => {
     try {
         await connectDB();
-        
         app.listen(port, () => {
             console.log(`Server running on port ${port}`);
         });
@@ -713,6 +701,7 @@ const startServer = async () => {
         process.exit(1);
     }
 };
+
 startServer();
 
 const checkExistingSession = async (phoneNumber) => {
