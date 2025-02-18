@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html dir="rtl">
+
+<head>
+    <title>ניהול קבוצות וואטסאפ</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <link rel="stylesheet" href="dashboard.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <div class="header">
+            <h1>ניהול קבוצות וואטסאפ</h1>
+            <button id="logoutBtn" class="logout-button">התנתק</button>
+        </div>
+
+        <div class="content">
+            <div id="initial-loading" class="loading-indicator">
+                <div class="spinner"></div>
+                <p>טוען...</p>
+            </div>
+
+            <div id="connection-section">
+                <div id="instructions">
+                    <p>ברוכים הבאים למערכת ניהול קבוצות וואטסאפ</p>
+                    <p>יש להזין מספר טלפון ולסרוק את הקוד QR</p>
+                </div>
+
+                <div id="phone-form" class="phone-form">
+                    <div class="phone-input-container">
+                        <span class="prefix">+972</span>
+                        <input type="tel" id="phoneInput" class="phone-input" placeholder="הזן מספר טלפון">
+                    </div>
+                    <button id="submitPhone" class="button">התחבר</button>
+                </div>
+
+                <div id="connection-process" style="display: none;">
+                    <div id="qrcode"></div>
+                    <div id="status"></div>
+                </div>
+            </div>
+
+            <div id="groups" style="display: none;">
+                <div id="loading" style="display: none;">טוען קבוצות...</div>
+
+                <div class="groups-controls">
+                    <button id="selectAllGroups" class="button">בחר הכל</button>
+                    <button id="clearSelectedGroups" class="button">מחק נבחרות</button>
+                </div>
+
+                <ul id="groupList"></ul>
+
+                <div class="message-section">
+                    <textarea id="messageText" class="textarea" placeholder="הזן הודעה לשליחה"></textarea>
+                    <input type="datetime-local" id="scheduleTime" class="datetime-input">
+                    <button id="sendMessage" class="button">שלח הודעה</button>
+                </div>
+            </div>
+        </div>
+
+        <nav class="bottom-nav">
+            <a class="nav-item active" data-tab="connect-tab">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="16" height="16" x="4" y="4" rx="2" />
+                    <path d="M9 9h6v6H9z" />
+                    <path d="M15 2v2" />
+                    <path d="M15 20v2" />
+                    <path d="M2 15h2" />
+                    <path d="M20 15h2" />
+                </svg>
+                התחברות
+            </a>
+            <a class="nav-item" data-tab="groups-tab">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                קבוצות
+            </a>
+            <a class="nav-item" data-tab="message-tab">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                הודעות
+            </a>
+        </nav>
+    </div>
+
+    <script>
+        const eventSource = new EventSource('/events');
+        let cachedGroups = null;
+
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tabId = item.getAttribute('data-tab');
+
+                document.querySelectorAll('.tab-content').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                document.getElementById(tabId).classList.add('active');
+
+                document.querySelectorAll('.nav-item').forEach(navItem => {
+                    navItem.classList.remove('active');
+                });
+                item.classList.add('active');
+            });
+        });
+
+        let codeReceived = false;
+        let codeCheckInterval;
+
+
+
+        function checkForCode() {
+            if (codeReceived) {
+                clearInterval(codeCheckInterval);
+                return;
+            }
+
+            fetch('/code')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code) {
+                        codeReceived = true;
+                        clearInterval(codeCheckInterval);
+
+                        const codeStr = String(data.code);
+
+                        const codeHtml = codeStr.split('').map((digit, index) => `
+                    <div class="code-digit">
+                        ${digit}
+                    </div>${index === 3 ? '<div class="code-separator">-</div>' : ''}`
+                        ).join('');
+
+                        document.getElementById('qrcode').innerHTML = `
+                    <div class="code-container">
+                        <div class="code-display">
+                            ${codeHtml}
+                        </div>
+                        <button id="copyCodeBtn" class="copy-button">העתק קוד</button>
+                    </div>`;
+
+                        document.getElementById('status').innerText = 'השתמש בקוד זה להתחברות';
+
+                        document.getElementById('copyCodeBtn').addEventListener('click', () => {
+                            navigator.clipboard.writeText(codeStr)
+                                .then()
+                                .catch(err => console.error('Error copying code:', err));
+                        });
+                    }
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    if (codeReceived) {
+                        clearInterval(codeCheckInterval);
+                    }
+                });
+        }
+        document.getElementById('submitPhone').addEventListener('click', async () => {
+            initialConnect();
+            setTimeout(() => {
+                codeCheckInterval = setInterval(checkForCode, 2000);
+            }, 17000);
+            const phoneInput = document.getElementById('phoneInput');
+            const phoneNumber = phoneInput.value.trim();
+
+            if (!phoneNumber || phoneNumber.length < 9) {
+                alert('נא להזין מספר טלפון תקין');
+                return;
+            }
+
+            try {
+                const response = await fetch('/start-connection', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phoneNumber })
+                });
+
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                document.getElementById('phone-form').style.display = 'none';
+                document.getElementById('connection-process').style.display = 'block';
+
+                setTimeout(() => {
+                    codeCheckInterval = setInterval(checkForCode, 2000);
+                }, 17000);
+
+            } catch (err) {
+                console.error('Error:', err);
+                alert('אירעה שגיאה בתהליך ההתחברות');
+            }
+        });
+
+        async function initialConnect() {
+            try {
+                const response = await fetch('/qr', {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                const data = await response.json();
+                console.log('QR Code data:', data);
+            } catch (error) {
+                console.error('Error during initial connection:', error);
+                alert('שגיאה בהתחברות: ' + error.message);
+            }
+        }
+
+        async function fetchGroups() {
+            console.time('fetchGroups');
+            try {
+                document.getElementById('loading').style.display = 'block';
+
+                if (cachedGroups) {
+                    console.log('Using cached groups');
+                    displayGroups(cachedGroups);
+                    return;
+                }
+
+                const response = await fetch('/groups', {
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                });
+
+                if (!response.ok) throw new Error('Network response was not ok');
+                const groups = await response.json();
+
+                cachedGroups = groups;
+                console.timeEnd('fetchGroups');
+                displayGroups(groups);
+            } catch (err) {
+                console.error('Error:', err);
+                document.getElementById('status').innerText = 'אירעה שגיאה: ' + err.message;
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function displayGroups(groups) {
+            console.time('displayGroups');
+            const groupList = document.getElementById('groupList');
+            groupList.innerHTML = '';
+
+            const fragment = document.createDocumentFragment();
+            const template = document.createElement('template');
+
+            const html = groups.map(group =>
+                `<li><input type="checkbox" class="groupCheckbox" value="${group.id}"> ${group.name}</li>`
+            ).join('');
+
+            template.innerHTML = html;
+            fragment.appendChild(template.content);
+            groupList.appendChild(fragment);
+
+            document.getElementById('groups').style.display = 'block';
+            document.getElementById('status').innerText = `נטענו ${groups.length} קבוצות בהצלחה`;
+            console.timeEnd('displayGroups');
+        }
+
+        eventSource.onmessage = function (event) {
+            if (event.data === 'client_ready') {
+                document.getElementById('qrcode').style.display = 'none';
+                document.getElementById('status').style.display = 'none';
+                document.getElementById('instructions').style.display = 'none';
+                fetchGroups();
+            }
+            if (event.data === 'authenticated') {
+                document.getElementById('qrcode').style.display = 'none';
+                document.getElementById('status').style.display = 'none';
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('instructions').style.display = 'none';
+            }
+        };
+
+        let allSelected = false;
+        document.getElementById('selectAllGroups').addEventListener('click', () => {
+            const checkboxes = document.querySelectorAll('.groupCheckbox');
+            allSelected = !allSelected;
+            checkboxes.forEach(checkbox => checkbox.checked = allSelected);
+            document.getElementById('selectAllGroups').innerText =
+                allSelected ? 'בטל בחירה' : 'בחר הכל';
+        });
+
+        document.getElementById('clearSelectedGroups').addEventListener('click', async () => {
+            const selectedGroups = Array.from(document.querySelectorAll('.groupCheckbox:checked'))
+                .map(cb => cb.value)
+                .filter(Boolean);
+
+            if (selectedGroups.length === 0) {
+                alert('לא נבחרו קבוצות למחיקה');
+                return;
+            }
+
+            if (!confirm('האם אתה בטוח שברצונך למחוק את הקבוצות שנבחרו?')) {
+                return;
+            }
+
+            console.log("Sending groups for deletion:", selectedGroups);
+
+            try {
+                const response = await fetch('/clear-groups', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ groupIds: selectedGroups })
+                });
+
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                const result = await response.json();
+                alert(result.message);
+                window.cachedGroups = null;
+                fetchGroups();
+            } catch (err) {
+                console.error('Error:', err);
+                alert('אירעה שגיאה: ' + err.message);
+            }
+        });
+
+
+
+        document.getElementById('sendMessage').addEventListener('click', async () => {
+            const selectedGroups = Array.from(document.querySelectorAll('.groupCheckbox:checked'))
+                .map(cb => cb.value);
+
+            if (selectedGroups.length === 0) {
+                alert('לא נבחרו קבוצות לשליחת ההודעה');
+                return;
+            }
+
+            const messageText = document.getElementById('messageText').value.trim();
+            if (!messageText) {
+                alert('נא להזין תוכן להודעה');
+                return;
+            }
+
+            const scheduleTime = document.getElementById('scheduleTime').value;
+            let scheduledTimestamp = null;
+
+            if (scheduleTime) {
+                scheduledTimestamp = new Date(scheduleTime).getTime();
+                if (scheduledTimestamp < Date.now()) {
+                    alert('לא ניתן לתזמן הודעה לזמן שכבר עבר');
+                    return;
+                }
+            }
+
+            if (!confirm('האם אתה בטוח שברצונך לשלוח את ההודעה לקבוצות שנבחרו?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/send-message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        groupIds: selectedGroups,
+                        message: messageText,
+                        scheduleTime: scheduledTimestamp
+                    })
+                });
+
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                const result = await response.json();
+                alert(result.message);
+
+                document.getElementById('messageText').value = '';
+                document.getElementById('scheduleTime').value = '';
+
+            } catch (err) {
+                console.error('Error:', err);
+                alert('אירעה שגיאה בשליחת ההודעה: ' + err.message);
+            }
+        });
+
+
+        async function checkExistingSession() {
+            try {
+                const response = await fetch('/check-session');
+                const data = await response.json();
+
+                if (data.hasSession) {
+                    document.getElementById('phone-form').style.display = 'none';
+                    document.getElementById('connection-process').style.display = 'block';
+                    document.getElementById('status').innerText = 'מתחבר לחשבון קיים...';
+
+                    setTimeout(() => {
+                        codeCheckInterval = setInterval(checkForCode, 2000);
+                    }, 2000);
+                }
+            } catch (error) {
+                console.error('Error checking session:', error);
+            }
+        }
+        document.addEventListener('DOMContentLoaded', checkExistingSession);
+
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            if (confirm('האם אתה בטוח שברצונך להתנתק?')) {
+                try {
+                    await fetch('/api/auth/logout', { method: 'POST' });
+                    window.location.href = '/login.html';
+                } catch (error) {
+                    console.error('Error logging out:', error);
+                    alert('אירעה שגיאה בהתנתקות');
+                }
+            }
+        });
+
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            const selectedTab = document.getElementById(tabName);
+            if (selectedTab) {
+                selectedTab.classList.add('active');
+            }
+
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+        }
+
+
+        function displayGroups(groups) {
+            console.time('displayGroups');
+            const groupList = document.getElementById('groupList');
+
+            if (!groupList) {
+                console.error('groupList element not found');
+                return;
+            }
+
+            groupList.innerHTML = '';
+
+            groups.forEach(group => {
+                if (!group.id || !group.name) {
+                    console.error("Skipping invalid group:", group);
+                    return;
+                }
+
+                const listItem = document.createElement('li');
+                listItem.innerHTML = `
+            <input type="checkbox" class="groupCheckbox" value="${group.id}"> 
+            ${group.name}
+        `;
+
+                groupList.appendChild(listItem);
+            });
+
+            console.timeEnd('displayGroups');
+        }
+
+
+        let isFetchingGroups = false;
+
+        async function fetchGroups() {
+            if (isFetchingGroups) {
+                console.warn('fetchGroups already running, skipping duplicate call.');
+                return;
+            }
+
+            console.time('fetchGroups');
+            isFetchingGroups = true;
+
+            try {
+                document.getElementById('loading').style.display = 'block';
+
+                if (window.cachedGroups) {
+                    console.log('Using cached groups');
+                    displayGroups(window.cachedGroups);
+                    return;
+                }
+
+                const response = await fetch('/groups');
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                const groups = await response.json();
+                window.cachedGroups = groups;
+
+                console.timeEnd('fetchGroups');
+                displayGroups(groups);
+            } catch (err) {
+                console.error('Error fetching groups:', err);
+                document.getElementById('status').innerText = 'Error fetching groups: ' + err.message;
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                isFetchingGroups = false;
+            }
+        }
+
+        async function checkConnectionStatus() {
+            try {
+                const response = await fetch('/connection-status');
+                const data = await response.json();
+
+                if (data.isConnected) {
+                    document.getElementById('connection-section').style.display = 'none';
+                    document.getElementById('groups').style.display = 'block';
+                    fetchGroups();
+                } else if (data.hasSession && data.whatsappNumber) {
+                    document.getElementById('status').innerText = 'מתחבר מחדש...';
+
+                    const startResponse = await fetch('/start-connection', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ phoneNumber: data.whatsappNumber })
+                    });
+
+                    if (startResponse.ok) {
+                        document.getElementById('qrcode').style.display = 'none';
+                        document.getElementById('phone-form').style.display = 'none';
+                        document.getElementById('status').innerText = 'מתחבר לחשבון קיים...';
+                    }
+                } else {
+                    document.getElementById('phone-form').style.display = 'block';
+                    document.getElementById('connection-section').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error checking connection status:', error);
+                document.getElementById('status').innerText = 'שגיאה בבדיקת החיבור';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkConnectionStatus();
+        });
+
+        eventSource.onmessage = function (event) {
+            if (event.data === 'client_ready') {
+                document.getElementById('connection-section').style.display = 'none';
+                document.getElementById('groups').style.display = 'block';
+                document.getElementById('status').style.display = 'none';
+                fetchGroups();
+
+                document.querySelectorAll('.nav-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                document.querySelector('[onclick="showTab(\'groups\')"]').classList.add('active');
+            }
+            if (event.data === 'authenticated') {
+                document.getElementById('qrcode').style.display = 'none';
+                document.getElementById('status').style.display = 'none';
+                document.getElementById('loading').style.display = 'block';
+            }
+        };
+
+        function showTab(tabName) {
+            if (tabName === 'groups' && clientInstance) {
+                document.getElementById('connection-section').style.display = 'none';
+                document.getElementById('groups').style.display = 'block';
+            } else if (tabName === 'connection') {
+                document.getElementById('connection-section').style.display = 'block';
+                document.getElementById('groups').style.display = 'none';
+            }
+
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+        }
+    </script>
+</body>
+
+</html>
